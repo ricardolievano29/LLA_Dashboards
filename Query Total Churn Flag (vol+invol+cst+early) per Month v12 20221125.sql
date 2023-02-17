@@ -2,6 +2,7 @@ with parameters as (
 select
 --##############################################################
 --### Change Date in this line to define paying period #########
+-- The logic must be last day of the previous month in start_date and last day of current month in end_date
 date('2022-10-31') as start_date,
 date('2022-11-23') as end_date,
 90 as max_overdue_active_base
