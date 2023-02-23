@@ -23,10 +23,47 @@ SELECT * FROM "lcpr.stage.prod"."lcpr_interactions_csg"
      
 --- #### Reiterative tickets
 
--- ,initial_table as (
+,initial_table as (
 SELECT
+    interaction_start_time,
+    interaction_id,
     date_trunc('Month', date(interaction_start_time)) as ticket_month, 
     account_id, 
     last_value(interaction_start_time) over (partition by account_id, date_trunc('Month', date(interaction_start_time)) order by interaction_start_time) as last_int_dt
 FROM interactions
--- )
+)
+
+,tickets_count as (
+SELECT 
+    Ticket_Month, 
+    account_id, 
+    count(distinct interaction_id) as tickets
+FROM initial_table
+WHERE interaction_start_time between (last_int_dt - interval '60' day) and last_int_dt
+GROUP BY Ticket_Month, account_id
+)
+
+, reiteractions_summary as (
+SELECT
+    *,
+    case when tickets = 1 then account_id else null end as one_tckt, 
+    case when tickets > 1 then account_id else null end as over1_tckt, 
+    case when tickets = 2 then account_id else null end as two_tckt, 
+    case when tickets >= 3 then account_id else null end as three_tckt
+FROM tickets_count
+)
+
+, reiteractiontickets_flags as (
+SELECT 
+    f.*,
+    Ticket_Month as RTicket_Month, 
+    one_tckt, 
+    over1_tckt, 
+    two_tckt, 
+    three_tckt
+FROM fixed_table f
+LEFT JOIN reiteractions_summary r
+    ON cast(f.fix_s_att_account as varchar) = cast(account_id as varchar) and f.fix_s_dim_month = r.Ticket_Month
+)
+
+SELECT * FROM reiteractiontickets_flags --- It works (23/02/2023 2:00pm)
