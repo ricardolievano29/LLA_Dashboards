@@ -9,7 +9,7 @@ SELECT * FROM "db_stage_dev"."lcpr_fixed_table_jan_feb23"
 ) --- WARNING: The table name will be updated, so keep the code with the right name.
  
 , interactions as (
-SELECT * FROM "lcpr.stage.prod"."lcpr_interactions_csg"
+SELECT * FROM "lcpr.stage.prod"."lcpr_interactions_csg" 
 )
     
 -- ,fmc_table as 
@@ -126,7 +126,7 @@ SELECT
     fix_s_att_account, 
     count(*) as num_records --- What about the use of distinct?
 FROM outlier_repair_flag
-WHERE fix_s_dim_month = date(fix_e_att_maxstart) --- Is this the right month choose? There is column called simply 'Month' as in Official CJW Sprint 5 code in GitLab.
+-- WHERE fix_s_dim_month = date(fix_e_att_maxstart) --- Is this the right month choose? There is no column called simply 'Month' as in Official CJW Sprint 5 code in GitLab nor dt.
 GROUP BY distinct fix_s_dim_month, fix_s_att_account
 )
 
@@ -143,33 +143,36 @@ LEFT JOIN tickets_per_account t
     ON cast(f.fix_s_att_account as varchar) = cast(t.account_id as varchar) and f.fix_s_dim_month = t.Ticket_Month
 )
 
--- , results_table_S5 as (
--- SELECT
---     Month, 
---     E_Final_Tech_Flags, 
---     E_FMC_Segment, 
---     E_FMCType, 
---     E_FinalTenureSegment, 
---     count(distinct fixed_account) as activebase, 
---     count(distinct one_tckt) as one_ticket, 
---     count(distinct over1_tickt) as over1_ticket, 
---     count(distinct two_tckt) as two_tickets, 
---     count(distinct three_tckt) as three_more_tickets, 
---     count(distinct techticket) as ticket_customers, 
---     sum(adj_tickets) as total_tickets, 
---     count(distinct outlier_repair) as outlier_repairs
--- FROM ticket_density_flag
--- WHERE
---     finalchurnflag != 'Fixed Churner'
---     and waterfall_flag != 'Downsell-Fixed Customer Gap'
---     and waterfall_flag != 'Fixed Base Exceptions'
---     and mainmovement != '6.Null last day'
---     and waterfall_flag != 'Churn Exception'
---     and month = date(dt)
--- GROUP BY 1, 2, 3, 4, 5
--- ORDER BY 1, 2, 3, 4, 5
--- )
+, results_table_S5 as (
+SELECT
+    fix_s_dim_month, 
+    fix_e_fla_tech,
+    fix_e_fla_tech, 
+    count(distinct fix_s_att_account) as activebase, 
+    count(distinct one_tckt) as one_ticket, 
+    count(distinct over1_tckt) as over1_ticket, 
+    count(distinct two_tckt) as two_tickets, 
+    count(distinct three_tckt) as three_more_tickets, 
+    count(distinct techticket) as ticket_customers, 
+    sum(adj_tickets) as total_tickets, 
+    count(distinct outlier_repair) as outlier_repairs
+FROM ticket_density_flag
+WHERE
+    fix_s_fla_churnflag != '1. Fixed Churner'
+    --- and waterfall_flag != 'Downsell-Fixed Customer Gap'
+    --- and waterfall_flag != 'Fixed Base Exceptions'
+    and fix_s_fla_mainmovement != '6.Null last day'
+    --- and waterfall_flag != 'Churn Exception'
+    --- and month = date(dt)
+GROUP BY 1, 2, 3
+ORDER BY 1, 2, 3
+)
 
---- 'Translate' this last results_table to PR columns names.
+SELECT distinct * FROM results_table_S5
 
-SELECT * FROM ticket_density_flag
+--- It seems that everything works! (24/2/2023 3:30pm)
+--- It only shows info for January 2023.
+
+-- SELECT count(distinct fix_s_att_account) FROM fixed_table WHERE fix_e_fla_tech = 'HFC'
+
+--- Interaction start date and interaction end date are always the same in interactions PR, so we can't flag outlier repairs.
