@@ -66,4 +66,17 @@ LEFT JOIN reiteractions_summary r
     ON cast(f.fix_s_att_account as varchar) = cast(account_id as varchar) and f.fix_s_dim_month = r.Ticket_Month
 )
 
-SELECT * FROM reiteractiontickets_flags --- It works (23/02/2023 2:00pm)
+--- It works (23/02/2023 2:00pm)
+
+--- #### Outlier repair times - using interactions
+
+repair_times as (
+SELECT
+    date_trun('Month', date(interaction_start_time)) as Repair_Month, 
+    account_id as account, 
+    interaction_start_time, 
+    interaction_end_time, 
+    date_diff('day', interaction_start_time, interaction_end_time) as solving_time
+FROM interactions
+WHERE   interaction_status = 'CLOSED'
+)
