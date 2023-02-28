@@ -75,7 +75,7 @@ SELECT
 FROM clean_interaction_time
 )
 
---- ### Reiterative tickets
+--- ### Repeated callers
 
 , last_interaction as (
 SELECT 
