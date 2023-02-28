@@ -232,3 +232,21 @@ GROUP BY 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16
 --     sum(number_tickets) as number_tickets
 -- FROM final_fields
 -- WHERE number_tickets >= 3
+
+--- ### Duplicates validation
+
+-- SELECT count(distinct fix_s_att_account) as num_clients FROM "db_stage_dev"."lcpr_fixed_table_jan_feb23"
+-- --- Result: 513,317
+
+-- --- Number of different accounts recorded
+-- SELECT count(distinct fix_s_att_account) as num_clients FROM (SELECT first_value(fix_s_att_account) over (partition by fix_s_att_account) as fix_s_att_account FROM "db_stage_dev"."lcpr_fixed_table_jan_feb23")
+-- --- Result: 513,317
+
+
+-- --- Number of interactions recorded
+-- SELECT count(distinct interaction_id) as num_records FROM "lcpr.stage.prod"."lcpr_interactions_csg"
+-- --- Result: 984,858
+
+-- --- Number of different interactions recorded
+-- SELECT count(distinct interaction_id) as num_records FROM (SELECT first_value(interaction_id) over (partition by interaction_id) as interaction_id FROM "lcpr.stage.prod"."lcpr_interactions_csg")
+-- --- Result: 984,858
