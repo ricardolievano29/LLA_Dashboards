@@ -10,7 +10,7 @@ WITH
 
 
 
-, fmc_table as ( --- This actually is the Fixed Table, it is called fmc just to get ready to when that table is ready
+, fmc_table as ( --- This actually is the Fixed Table, it is called fmc just to get ready for when that table is ready
 SELECT
     fix_s_dim_month, --- month
     fix_b_fla_tech, --- B_Final_TechFlag
@@ -33,7 +33,7 @@ SELECT
     fix_e_att_active --- f_activebom
     --- mobile_activeeom
     --- mobilechurnflag
-FROM "db_stage_dev"."lcpr_fixed_table_jan_feb23"
+FROM "db_stage_dev"."lcpr_fixed_table_jan_feb28" --- Keep this updated to the latest version!
 WHERE 
     fix_s_dim_month = (SELECT input_month FROM parameters)
 )
