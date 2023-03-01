@@ -153,16 +153,6 @@ LEFT JOIN tickets_tier I
     ON cast(F.fix_s_att_account as varchar) = cast(I.account_id as varchar) and F.fix_s_dim_month = I.interaction_month
 )
 
-, number_tickets_flag as(
-SELECT
-    F.*, 
-    number_tickets
-FROM ticket_tier_flag F
-LEFT JOIN tickets_per_month I
-    ON cast(F.fix_s_att_account as varchar) = cast(I.account_id as varchar) and F.fix_s_dim_month = I.month
-    
-)
-
 , final_fields as (
 SELECT
     distinct fix_s_dim_month, -- month
@@ -187,9 +177,8 @@ SELECT
    -- finalaccount
     fix_s_att_account, -- fixedaccount
     tickets,
-    records_per_user,
-    number_tickets
-FROM number_tickets_flag
+    records_per_user
+FROM ticket_tier_flag
 )
 
 SELECT
@@ -216,22 +205,20 @@ SELECT
     fix_s_att_account, -- fixedaccount
     tickets,
     records_per_user,
-    number_tickets,
     count(distinct fix_s_att_account) as Total_Accounts,
     count(distinct fix_s_att_account) as Fixed_Accounts, 
-    count(distinct tickets) as Userstickets, 
-    round(sum(number_tickets), 0) as number_tickets
+    count(distinct tickets) as Userstickets
 FROM final_fields
 -- WHERE ((fix_s_fla_churntype != '2. Fixed Involuntary Churner' and fix_s_fla_churntype != '1. Fixed Voluntary Churner') or fix_s_fla_churntype is null) and fix_s_fla_churntype != 'Fixed Churner'
-GROUP BY 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16
+GROUP BY 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15
 
 
 --- ### Specific numbers
 
 -- SELECT
---     sum(number_tickets) as number_tickets
+--   count(distinct fix_s_att_account) as num_clients
 -- FROM final_fields
--- WHERE number_tickets >= 3
+-- WHERE ticket_tier = '1'
 
 --- ### Duplicates validation
 
@@ -247,6 +234,9 @@ GROUP BY 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16
 -- SELECT count(distinct interaction_id) as num_records FROM "lcpr.stage.prod"."lcpr_interactions_csg"
 -- --- Result: 984,858
 
+-- --- Number of different interactions recorded
+-- SELECT count(distinct interaction_id) as num_records FROM (SELECT first_value(interaction_id) over (partition by interaction_id) as interaction_id FROM "lcpr.stage.prod"."lcpr_interactions_csg")
+-- --- Result: 984,858
 -- --- Number of different interactions recorded
 -- SELECT count(distinct interaction_id) as num_records FROM (SELECT first_value(interaction_id) over (partition by interaction_id) as interaction_id FROM "lcpr.stage.prod"."lcpr_interactions_csg")
 -- --- Result: 984,858
