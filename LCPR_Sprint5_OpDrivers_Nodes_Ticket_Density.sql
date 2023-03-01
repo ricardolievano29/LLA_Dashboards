@@ -63,8 +63,8 @@ FROM "lcpr.stage.prod"."lcpr_interactions_csg"
 WHERE
     (cast(interaction_start_time as varchar) != ' ') 
     and (interaction_start_time is not null)
-    and date_trunc('month', cast(substr(cast(interaction_start_time as varchar),1,10) as date)) = ((SELECT input_month FROM parameters)) 
-        -- and ((SELECT input_month FROM parameters) + interval '1' month)
+    and date_trunc('month', cast(substr(cast(interaction_start_time as varchar),1,10) as date)) between ((SELECT input_month FROM parameters)) 
+        and ((SELECT input_month FROM parameters) + interval '1' month)
         
 )
 
@@ -170,7 +170,7 @@ INNER JOIN nodes_data N
 SELECT
     bridger_addr_hse, 
     count(distinct fix_s_att_account) as num_clients, 
-    count(distinct case when tickets > 0 then fix_s_att_account else null end) as num_clients_w_tickets, 
+    count(distinct case when tickets > 0 then fix_s_att_account else null end) as num_clients_w_high_tickets, 
     cast(count(distinct case when tickets > 0 then fix_s_att_account else null end) as double)/cast(count(distinct fix_s_att_account) as double) as pct_clients_w_tickets
 FROM nodes_flag
 GROUP BY 1
@@ -178,5 +178,5 @@ GROUP BY 1
 
 SELECT 
     count(distinct bridger_addr_hse) as hfc_nodes, 
-    count(distinct case when pct_clients_w_tickets > 0.06 then bridger_addr_hse else null end) as hfc_nodes_w_tickets
+    count(distinct case when pct_clients_w_tickets > 0.06 then bridger_addr_hse else null end) as hfc_nodes_w_high_tickets
 FROM relevant_nodes_flag
