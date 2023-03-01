@@ -5,7 +5,7 @@
 WITH
 
  parameters as (
- SELECT date_trunc('month', date('2022-12-01')) as input_month --- Input month you wish the code run for
+ SELECT date_trunc('month', date('2023-01-01')) as input_month --- Input month you wish the code run for
  )
 
 
@@ -33,7 +33,7 @@ SELECT
     fix_e_att_active --- f_activebom
     --- mobile_activeeom
     --- mobilechurnflag
-FROM "db_stage_dev"."lcpr_fixed_table_dec_feb28" --- Keep this updated to the latest version!
+FROM "db_stage_dev"."lcpr_fixed_table_jan_feb28" --- Keep this updated to the latest version!
 WHERE 
     fix_s_dim_month = (SELECT input_month FROM parameters)
 )
@@ -63,7 +63,8 @@ FROM "lcpr.stage.prod"."lcpr_interactions_csg"
 WHERE
     (cast(interaction_start_time as varchar) != ' ') 
     and (interaction_start_time is not null)
-    and date_trunc('month', cast(substr(cast(interaction_start_time as varchar),1,10) as date)) between ((SELECT input_month FROM parameters)) and ((SELECT input_month FROM parameters) + interval '1' month)
+    and date_trunc('month', cast(substr(cast(interaction_start_time as varchar),1,10) as date)) = ((SELECT input_month FROM parameters)) 
+        -- and ((SELECT input_month FROM parameters) + interval '1' month)
         
 )
 
@@ -75,17 +76,7 @@ SELECT
 FROM clean_interaction_time
 )
 
---- ### Nodes
-
-, nodes_data as (
-SELECT 
-    sub_acct_no_sbb,
-    bridger_addr_hse 
-    -- *
-FROM "lcpr.stage.prod"."insights_customer_services_rates_lcpr" 
-)
-
---- ### Tickets
+--- ### Tickets count
 
 , last_interaction as (
 SELECT 
@@ -137,45 +128,55 @@ WHERE interaction_date between window_day and last_interaction_date
 GROUP BY 1, 2
 )
 
+--- ### Nodes data
 
---- ### Flags for HFC nodes and callers
-
-, hfcnode_flag as (
+, nodes_data as (
 SELECT 
-    F.*, 
-    bridger_addr_hse
-FROM fmc_table_adj F
-LEFT JOIN nodes_data N
-    ON cast(F.fix_s_att_account as varchar) = cast(N.sub_acct_no_sbb as varchar)
-
+    sub_acct_no_sbb,
+    bridger_addr_hse, 
+    dt
+    -- *
+FROM "lcpr.stage.prod"."insights_customer_services_rates_lcpr"
+WHERE
+    play_type != '0P' 
+    and cust_typ_sbb = 'RES'
 )
+
+--- ### Nodes and tickets flags
 
 , tickets_flag as (
 SELECT 
-    F.*,
-    case 
-        when tickets = 0 then fix_s_att_account
-        when tickets is null then fix_s_att_account
-    else null end as tickets
-FROM hfcnode_flag F
-LEFT JOIN tickets_count I
-    ON cast(F.fix_s_att_account as varchar) = cast(I.account_id as varchar) and F.fix_s_dim_month = I.interaction_month
+    F.*, 
+    tickets
+FROM fmc_table_adj F
+LEFT JOIN tickets_count T
+    ON cast(F.fix_s_att_account as varchar) = cast(T.account_id as varchar) and F.fix_s_dim_month = T.interaction_month
 )
 
---- ### Final results
-, final_table as(
+, nodes_flag as (
+SELECT
+    F.*, 
+    bridger_addr_hse
+FROM tickets_flag F
+INNER JOIN nodes_data N
+        ON cast(F.fix_s_att_account as varchar) = cast(N.sub_acct_no_sbb as varchar) and F.fix_s_dim_month = date_trunc('month', date(dt))
+)
+
+--- 300 customers couldn't be matched with a node
+
+--- ### Results
+
+, relevant_nodes_flag as (
 SELECT
     bridger_addr_hse, 
-    cast(count(distinct fix_s_att_account) as double) as num_clients, 
-    cast(count(distinct tickets) as double) as client_w_tickets, 
-    cast(count(distinct tickets) as double)/cast(count(distinct fix_s_att_account) as double) as pct_tickets_in_nodes
-FROM tickets_flag
+    count(distinct fix_s_att_account) as num_clients, 
+    count(distinct case when tickets > 0 then fix_s_att_account else null end) as num_clients_w_tickets, 
+    cast(count(distinct case when tickets > 0 then fix_s_att_account else null end) as double)/cast(count(distinct fix_s_att_account) as double) as pct_clients_w_tickets
+FROM nodes_flag
 GROUP BY 1
 )
 
 SELECT 
-    count(distinct case when pct_tickets_in_nodes > 0.006 then bridger_addr_hse else null end) as num_nodes_w_high_tickets
-FROM final_table
-
--- SELECT distinct interactions FROM callers_flag LIMIT 100
-
+    count(distinct bridger_addr_hse) as hfc_nodes, 
+    count(distinct case when pct_clients_w_tickets > 0.06 then bridger_addr_hse else null end) as hfc_nodes_w_tickets
+FROM relevant_nodes_flag
