@@ -145,18 +145,11 @@ SELECT
     fix_s_fla_churntype, -- fixedchurntype
     fix_s_fla_mainmovement, -- fixedmainmovement
     -- waterfall_flag
-    -- mobile_activeeom
-    -- mobilechurnflag
-    -- finalaccount
-    fix_s_att_account, -- fixedaccount
-    records_per_user,
     count(distinct fix_s_att_account) as Total_Accounts,
     count(distinct fix_s_att_account) as Fixed_Accounts, 
     count(distinct outlier_repair) as outlier_repairs
 FROM final_fields
 -- WHERE ((fix_s_fla_churntype != '2. Fixed Involuntary Churner' and fix_s_fla_churntype != '1. Fixed Voluntary Churner') or fix_s_fla_churntype is null) and fix_s_fla_churntype != 'Fixed Churner'
-GROUP BY 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13
+GROUP BY 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11
 
 --- ### Specific numbers
-
--- SELECT count(distinct fix_s_att_account) FROM clean_interaction_time WHERE oulier_repairs is not null and outlier_repairs != 0 and outlier_repairs != '0'
