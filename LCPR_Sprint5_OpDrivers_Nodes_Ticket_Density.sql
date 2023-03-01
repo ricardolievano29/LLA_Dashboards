@@ -85,7 +85,7 @@ SELECT
 FROM "lcpr.stage.prod"."insights_customer_services_rates_lcpr" 
 )
 
---- ### Callers
+--- ### Tickets
 
 , last_interaction as (
 SELECT 
@@ -94,27 +94,46 @@ SELECT
 FROM interactions_fields
 )
 
-, join_last_interaction as (
+, users_tickets as (
+SELECT
+    distinct account_id, 
+    interaction_id, 
+    interaction_date
+FROM interactions_fields
+WHERE
+    interaction_purpose_descrip in ( 
+    --- First technical (tickets)
+    'Antivirus Calls', 'Bloq Red Wifi', 'Bloqueo Red Wifi', 'Cable Card Install', 'Cable Problem', 'Call Fwd Activaci??n', 'Call Fwd Activacin', 'Call Fwd Activacion', 'Call Fwd Desactivar', 'Cambio Ssid', 'Ci: Cable Card Req', 'Commercial Accounts', 'Configuration', 'Cs: Change Name(fco)', 'Cs: Offer Correction', 'Cs: Portability', 'Email Issues', 'Eq: Deprogrammed', 'Eq: Intermittence', 'Eq: Lost', 'Eq: Lost/Stolen', 'Eq: No Conection', 'Eq: No Start', 'Eq: Not Working', 'Eq: Notif Letter', 'Eq: Pixels', 'Eq: Ref. By Csr', 'Eq: Replace Remote', 'Eq: Return Equip.', 'Eq: Up/Dwn/Side', 'Eq: Up/Side', 'Fast Busy Tone', 'Functions Oriented', 'G:disconect Warning', 'G:follow Up', 'G:order Entry Error', 'Headend Issues', 'Headend Power Outage', 'HSD Intermittent', 'HSD Issues', 'HSD No Browsing', 'HSD Problem', 'HSD Slow Service', 'Ibbs-Ip Issues', 'Integra 5', 'Internet Calls', 'Lnp Complete', 'Lnp In Process', 'Lnp Not Complete', 'Mcafee', 'Mi Liberty Problem', 'Nc Busy Tone', 'Nc Cancel Job', 'Nc Message V. Mail', 'Nc No Answer', 'Nc Ok Cust Confirmed', 'Nc Rescheduled', 'Nc Wrong Phone No.', 'No Browse', 'No Retent Relate', 'No Retention Call', 'No Service All', 'Non Pay', 'Np: Restard Svc Only', 'Nret- Contract', 'Nret- Diss Cust Serv', 'Nret- Equipment', 'Nret- Moving', 'Nret- No Facilities', 'Outages', 'Phone Cant Make Call', 'Phone Cant Recv Call', 'Phone No Tone', 'PPV Order', 'PPV/Vod Problem', 'Reconnection', 'Refered Same Day', 'Restard Svc Only', 'Restart 68-69 Days', 'Restart Svc Only', 'Ret-Serv Education', 'Ret-Sidegrade', 'Ret-Upgrade', 'Retained Customer', 'Retent Effort Call', 'Retention', 'Return Mail', 'Rt: Dowgrde Convert', 'Rt: Dowgrde Premium', 'Schd Appiont 4 Tech', 'Self-Inst Successful', 'Self-Install', 'Self-Install N/A', 'Self-Int Rejected', 'Service Techs', 'Sl: Advanced Prod.', 'Sl: Install/Cos Conf', 'Sl: Outbound Sale', 'Sl: Product Info', 'Sl: Restart', 'Sl: Upg Addon/Tiers', 'Sl: Upg Events', 'Sl: Upg Service', 'Sl: Upgrade Tn', 'Sol Contrasena Wifi', 'Solicitud Contrasena', 'Solicitud Num Cuent', 'Solicitud Num Cuenta', 'Sp: Aee-No Liberty', 'Vd: Tech.Service', 'Video Issues', 'Video Problem', 'Video Programming', 'Voice Issues', 'Voice Outages', 'Wifi Password', 'Work Order Status', 
+    --- Now truckroll ones
+        'Ci: Inst/Tc Status', 'Ci: Install Stat', 'Ci: Installer / Tech', 'Create Trouble Call', 'Cs: Transfer', 'Dialtone/Line Issues', 'Eq: Not Recording', 'Eq: Port Damage', 'Eq: Ref By Tech/Inst', 'Eq: Vod No Access', 'Eq:error E1:26 E1:36', 'Equipment Problem', 'Equipment Swap', 'Fiber Outages', 'Maintenance Techs', 'Provision/Contractor', 'Sl: New Sales', 'Sl: Upgrade HSD A/O', 'Sp: Already Had Tc', 'Sp: Cancelled Tc', 'Sp: Drops Issues', 'Sp: HSD-Intermit.', 'Sp: HSD-No Browse', 'Sp: HSD-No Connect', 'Sp: HSD-Speed Issues', 'Sp: No Signal-3 Pack', 'Sp: Pending Mr-Sro', 'Sp: Poste Ca?-do', 'Sp: Poste Cado', 'Sp: PPV', 'Sp: Precortes Issues', 'Sp: Recent Install', 'Sp: Referred To Noc', 'Sp: Tel-Cant Make', 'Sp: Tel-Cant Receive', 'Sp: Tel-No Tone', 'Sp: Video-Intermit.', 'Sp: Video-No Signal', 'Sp: Video-Tiling', 'Sp: Vod', 'Sp:hsd- Ip Issues', 'Sp:hsd- Wifi Issues', 'Sp:tc/Mr Confirm', 'Sp:tel- Voice Mail', 'Status Of Install', 'Status/Trouble Calls', 'Tel Issues', 'Tel Problem', 'Telephony Calls', 'Transfer', 'Vd: Transferred')
+)
+
+, last_ticket as (
+SELECT 
+    account_id as last_account, 
+    first_value(interaction_date) over(partition by account_id, date_trunc('month', interaction_date) order by interaction_date desc) as last_interaction_date
+FROM users_tickets
+)
+
+, join_last_ticket as (
 SELECT
     account_id, 
     interaction_id, 
     interaction_date, 
     date_trunc('month', last_interaction_date) as interaction_month, 
     last_interaction_date, 
-    date_add('MONTH', -1, last_interaction_date) as window_day
-FROM interactions_fields W
-INNER JOIN last_interaction L
-    ON W.account_id = L.last_account
-)
+    date_add('day', -60, last_interaction_date) as window_day
+FROM users_tickets W
+INNER JOIN last_ticket L
+    ON W.account_id = L.last_account)
 
-, interactions_count as (
-SELECT
+, tickets_count as (
+SELECT 
     interaction_month, 
     account_id, 
-    count(distinct interaction_id) as interactions
-FROM join_last_interaction
-WHERE
-    interaction_date between window_day and last_interaction_date
+    count(distinct interaction_id) as tickets
+FROM join_last_ticket
+WHERE interaction_date between window_day and last_interaction_date
 GROUP BY 1, 2
 )
 
@@ -131,25 +150,32 @@ LEFT JOIN nodes_data N
 
 )
 
-, callers_flag as (
+, tickets_flag as (
 SELECT 
-    F.*, 
-    interactions
+    F.*,
+    case 
+        when tickets = 0 then fix_s_att_account
+        when tickets is null then fix_s_att_account
+    else null end as tickets
 FROM hfcnode_flag F
-LEFT JOIN interactions_count I
+LEFT JOIN tickets_count I
     ON cast(F.fix_s_att_account as varchar) = cast(I.account_id as varchar) and F.fix_s_dim_month = I.interaction_month
 )
 
 --- ### Final results
 , final_table as(
 SELECT
-    bridger_addr_hse as node, 
+    bridger_addr_hse, 
     cast(count(distinct fix_s_att_account) as double) as num_clients, 
-    cast(count(distinct case when interactions != 0 then fix_s_att_account else null end) as double) as num_callers
-FROM callers_flag
+    cast(count(distinct tickets) as double) as client_w_tickets, 
+    cast(count(distinct tickets) as double)/cast(count(distinct fix_s_att_account) as double) as pct_tickets_in_nodes
+FROM tickets_flag
 GROUP BY 1
 )
 
-SELECT cast(num_callers/num_clients as double) FROM final_table
+SELECT 
+    count(distinct case when pct_tickets_in_nodes > 0.006 then bridger_addr_hse else null end) as num_nodes_w_high_tickets
+FROM final_table
 
 -- SELECT distinct interactions FROM callers_flag LIMIT 100
+
