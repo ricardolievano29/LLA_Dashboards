@@ -201,16 +201,12 @@ SELECT
     -- mobile_activeeom
     -- mobilechurnflag
     ticket_tier,
-  -- finalaccount
-    fix_s_att_account, -- fixedaccount
-    tickets,
-    records_per_user,
     count(distinct fix_s_att_account) as Total_Accounts,
     count(distinct fix_s_att_account) as Fixed_Accounts, 
     count(distinct tickets) as Userstickets
 FROM final_fields
 -- WHERE ((fix_s_fla_churntype != '2. Fixed Involuntary Churner' and fix_s_fla_churntype != '1. Fixed Voluntary Churner') or fix_s_fla_churntype is null) and fix_s_fla_churntype != 'Fixed Churner'
-GROUP BY 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15
+GROUP BY 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12
 
 
 --- ### Specific numbers
