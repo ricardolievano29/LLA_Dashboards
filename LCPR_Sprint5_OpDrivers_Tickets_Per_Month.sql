@@ -62,6 +62,7 @@ LEFT JOIN repeated_accounts R
 , clean_interaction_time as (
 SELECT *
 FROM "lcpr.stage.prod"."lcpr_interactions_csg" --- There may be duplicates in interactions !!!
+ --- Filter by account_type !!!
 WHERE
     (cast(interaction_start_time as varchar) != ' ') 
     and (interaction_start_time is not null)
