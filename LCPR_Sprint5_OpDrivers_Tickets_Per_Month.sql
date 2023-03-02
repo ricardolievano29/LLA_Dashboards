@@ -35,6 +35,7 @@ SELECT
     --- mobilechurnflag
 FROM "db_stage_dev"."lcpr_fixed_table_jan_feb28" --- Make sure the right table is being used accordingly to the month requested.
 --- There may be duplicates in Fixed!!!
+--- Filter when extracting from Fixed Table!!!
 WHERE 
     fix_s_dim_month = (SELECT input_month FROM parameters)
 )
