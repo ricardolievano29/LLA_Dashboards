@@ -151,6 +151,7 @@ SELECT
 FROM fmc_table_adj F
 LEFT JOIN tickets_count T
     ON cast(F.fix_s_att_account as varchar) = cast(T.account_id as varchar) and F.fix_s_dim_month = T.interaction_month
+WHERE fix_e_fla_tech = 'HFC' --- We only need this kind of nodes
 )
 
 , nodes_flag as (
