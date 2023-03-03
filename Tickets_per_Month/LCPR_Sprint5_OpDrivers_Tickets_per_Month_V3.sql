@@ -70,7 +70,6 @@ WHERE
 , interactions_fields as (
 SELECT
     *,
-    --- Option 1: interaction_start_time
     cast(substr(cast(interaction_start_time as varchar), 1, 10) as date) as interaction_date, 
     date_trunc('month', cast(substr(cast(interaction_start_time as varchar), 1, 10) as date)) as month
 FROM clean_interaction_time
