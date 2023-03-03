@@ -143,31 +143,31 @@ WHERE fix_s_fla_churnflag = '2. Fixed NonChurner'
 )
 
 -- SELECT
---     fix_s_dim_month, -- month
---     fix_b_fla_tech, -- B_Final_TechFlag
---     fix_b_fla_fmc, -- B_FMCSegment
---     fix_b_fla_mixcodeadj, -- B_FMCType
---     fix_e_fla_tech, -- E_Final_TechFlag
---     fix_e_fla_fmc, -- E_FMCSegment
---     fix_e_fla_mixcodeadj, -- E_FMCType
---     -- b_final_tenure
---     -- e_final_tenure
---     fix_b_fla_tenure, -- B_FixedTenure
---     fix_e_fla_tenure, -- E_FixedTenure
---     -- finalchurnflag
---     -- fixedchurnflag
---     -- waterfall_flag
---     count(distinct fix_s_att_account) as Total_Accounts,
---     count(distinct fix_s_att_account) as Fixed_Accounts, 
---     sum(number_tickets) as number_tickets
--- FROM final_fields
--- -- WHERE fix_s_fla_churnflag = '2. Fixed NonChurner'
--- GROUP BY 1, 2, 3, 4, 5, 6, 7, 8, 9
+    fix_s_dim_month, -- month
+    fix_b_fla_tech, -- B_Final_TechFlag
+    fix_b_fla_fmc, -- B_FMCSegment
+    fix_b_fla_mixcodeadj, -- B_FMCType
+    fix_e_fla_tech, -- E_Final_TechFlag
+    fix_e_fla_fmc, -- E_FMCSegment
+    fix_e_fla_mixcodeadj, -- E_FMCType
+    -- b_final_tenure
+    -- e_final_tenure
+    fix_b_fla_tenure, -- B_FixedTenure
+    fix_e_fla_tenure, -- E_FixedTenure
+    -- finalchurnflag
+    -- fixedchurnflag
+    -- waterfall_flag
+    count(distinct fix_s_att_account) as Total_Accounts,
+    count(distinct fix_s_att_account) as Fixed_Accounts, 
+    sum(number_tickets) as number_tickets
+FROM final_fields
+-- WHERE fix_s_fla_churnflag = '2. Fixed NonChurner'
+GROUP BY 1, 2, 3, 4, 5, 6, 7, 8, 9
 
 -- ### Specific numbers
 
 --- Number of clients per tickets
--- SELECT distinct number_tickets, count(distinct fix_s_att_account) FROM final_fields GROUP BY 1 ORDER BY 2 desc
+-- SELECT distinct number_tickets, count(distinct fix_s_att_account) FROM final_fields GROUP BY 1 ORDER BY 1 asc, 2 desc
 
 --- Top 10 clients with most tickets
 -- SELECT fix_s_att_account, number_tickets FROM final_fields ORDER BY 2 desc
@@ -190,8 +190,8 @@ WHERE fix_s_fla_churnflag = '2. Fixed NonChurner'
 -- ORDER BY 2, 3, 4, 5, 6, 7, 8, 9, 10
 
 --- KPI calculation
-SELECT 
-    sum(number_tickets) as num_tickets, 
-    count(distinct fix_s_att_account) as active_base, 
-    round(cast(sum(number_tickets) as double)/(cast(count(distinct fix_s_att_account) as double)/100), 2) as tickets_per_100_users
-FROM final_fields
+-- SELECT 
+--     sum(number_tickets) as num_tickets, 
+--     count(distinct fix_s_att_account) as active_base, 
+--     round(cast(sum(number_tickets) as double)/(cast(count(distinct fix_s_att_account) as double)/100), 2) as tickets_per_100_users
+-- FROM final_fields
