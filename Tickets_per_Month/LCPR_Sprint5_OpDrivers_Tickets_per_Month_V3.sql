@@ -74,7 +74,7 @@ SELECT
     cast(substr(cast(interaction_start_time as varchar), 1, 10) as date) as interaction_date, 
     date_trunc('month', cast(substr(cast(interaction_start_time as varchar), 1, 10) as date)) as month
 FROM clean_interaction_time
-WHERE account_id = '8211790320579737' --- Just for experiments
+-- WHERE account_id = '8211790320579737' --- Just for experiments
 )
 
 --- ### Tickets per month
