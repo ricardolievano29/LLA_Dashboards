@@ -82,7 +82,8 @@ FROM clean_interaction_time
 SELECT
     distinct account_id, 
     interaction_id, 
-    interaction_date
+    interaction_date, 
+    case when interaction_purpose_descrip in ('Outages', 'Voice Outages', 'Fiber Outages') then 'outages' else 'not outages' end as outages
 FROM interactions_fields
 WHERE interaction_purpose_descrip in ( --- There may be a problem identifying tickets with interaction_purpose_descrip -> Outages considerations
     --- First tickets
@@ -95,13 +96,14 @@ WHERE interaction_purpose_descrip in ( --- There may be a problem identifying ti
 SELECT
     date_trunc('month', interaction_date) as month, 
     account_id, 
+    outages,
     --- ### Option 1: distinct interaction_date
     count(distinct interaction_date) as number_tickets
     --- ### Option 2: Non-distinct interaction_date
     -- count(interaction_date) as number_tickets
 FROM users_tickets
 WHERE interaction_id is not null
-GROUP BY 1, 2
+GROUP BY 1, 2, 3
 )
 
 --- ### Tickets per month flag (number of tickets)
@@ -109,6 +111,7 @@ GROUP BY 1, 2
 , number_tickets_flag as (
 SELECT
     F.*, 
+    outages,
     number_tickets
 FROM fmc_table_adj F 
 LEFT JOIN tickets_per_month I
@@ -137,37 +140,42 @@ SELECT
     -- mobilechurnflag
    -- finalaccount
     fix_s_att_account, -- fixedaccount
-    records_per_user, 
+    records_per_user,
+    outages,
     number_tickets
 FROM number_tickets_flag
 WHERE fix_s_fla_churnflag = '2. Fixed NonChurner'
 )
 
--- SELECT
---     fix_s_dim_month, -- month
---     fix_b_fla_tech, -- B_Final_TechFlag
---     fix_b_fla_fmc, -- B_FMCSegment
---     fix_b_fla_mixcodeadj, -- B_FMCType
---     fix_e_fla_tech, -- E_Final_TechFlag
---     fix_e_fla_fmc, -- E_FMCSegment
---     fix_e_fla_mixcodeadj, -- E_FMCType
---     -- b_final_tenure
---     -- e_final_tenure
---     fix_b_fla_tenure, -- B_FixedTenure
---     fix_e_fla_tenure, -- E_FixedTenure
---     -- finalchurnflag
---     -- fixedchurnflag
---     -- waterfall_flag
---     count(distinct fix_s_att_account) as Total_Accounts,
---     count(distinct fix_s_att_account) as Fixed_Accounts, 
---     sum(number_tickets) as number_tickets
--- FROM final_fields
--- GROUP BY 1, 2, 3, 4, 5, 6, 7, 8, 9
+SELECT
+     fix_s_dim_month, -- month
+     fix_b_fla_tech, -- B_Final_TechFlag
+     fix_b_fla_fmc, -- B_FMCSegment
+     fix_b_fla_mixcodeadj, -- B_FMCType
+     fix_e_fla_tech, -- E_Final_TechFlag
+     fix_e_fla_fmc, -- E_FMCSegment
+     fix_e_fla_mixcodeadj, -- E_FMCType
+     -- b_final_tenure
+     -- e_final_tenure
+     fix_b_fla_tenure, -- B_FixedTenure
+     fix_e_fla_tenure, -- E_FixedTenure
+     -- finalchurnflag
+     -- fixedchurnflag
+     -- waterfall_flag
+     outages,
+     count(distinct fix_s_att_account) as Total_Accounts,
+     count(distinct fix_s_att_account) as Fixed_Accounts, 
+     sum(number_tickets) as number_tickets
+FROM final_fields
+GROUP BY 1, 2, 3, 4, 5, 6, 7, 8, 9, 10
 
 -- ### Specific numbers
 
 --- Number of clients per tickets
 -- SELECT distinct number_tickets, count(distinct fix_s_att_account) FROM final_fields GROUP BY 1 ORDER BY 1 asc, 2 desc
+
+--- Total tickets segmented by outages
+-- SELECT outages, sum(number_tickets) FROM final_fields GROUP BY 1 --- Just 7 of the tickets are clasified as outages-related
 
 --- Top 5 clients with most tickets
 -- SELECT fix_s_att_account, number_tickets FROM final_fields ORDER BY 2 desc LIMIT 5
@@ -195,8 +203,8 @@ WHERE fix_s_fla_churnflag = '2. Fixed NonChurner'
 -- ORDER BY 2, 3, 4, 5, 6, 7, 8, 9, 10
 
 --- KPI calculation
-SELECT 
-    sum(number_tickets) as num_tickets, 
-    count(distinct fix_s_att_account) as active_base, 
-    round(cast(sum(number_tickets) as double)/(cast(count(distinct fix_s_att_account) as double)/100), 2) as tickets_per_100_users
-FROM final_fields
+-- SELECT 
+--     sum(number_tickets) as num_tickets, 
+--     count(distinct fix_s_att_account) as active_base, 
+--     round(cast(sum(number_tickets) as double)/(cast(count(distinct fix_s_att_account) as double)/100), 2) as tickets_per_100_users
+-- FROM final_fields
