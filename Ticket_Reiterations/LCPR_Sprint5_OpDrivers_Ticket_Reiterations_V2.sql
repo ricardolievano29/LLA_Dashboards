@@ -5,6 +5,7 @@ WITH
  parameters as (
  SELECT date_trunc('month', date('2023-01-01')) as input_month --- Input month you wish the code run for
  )
+ 
 , fmc_table as ( --- This actually is the Fixed Table, it is called fmc just to get ready for when that table is ready
 SELECT
     fix_s_dim_month, --- month
@@ -32,6 +33,7 @@ FROM "db_stage_dev"."lcpr_fixed_table_jan_mar06" --- Keep this updated to the la
 WHERE 
     fix_s_dim_month = (SELECT input_month FROM parameters)
 )
+
 , repeated_accounts as (
 SELECT 
     fix_s_dim_month, 
@@ -49,6 +51,7 @@ FROM fmc_table F
 LEFT JOIN repeated_accounts R
     ON F.fix_s_att_account = R.fix_s_att_account and F.fix_s_dim_month = R.fix_s_dim_month
 )
+
 , clean_interaction_time as (
 SELECT *
 FROM "lcpr.stage.prod"."lcpr_interactions_csg"
@@ -58,6 +61,7 @@ WHERE
     and date_trunc('month', cast(substr(cast(interaction_start_time as varchar),1,10) as date)) between ((SELECT input_month FROM parameters)) and ((SELECT input_month FROM parameters) + interval '1' month)
     and account_type = 'RES'
 )
+
 , interactions_fields as (
 SELECT
     *, 
@@ -65,7 +69,9 @@ SELECT
     date_trunc('month', cast(substr(cast(interaction_start_time as varchar), 1, 10) as date)) as month
 FROM clean_interaction_time
 )
+
 --- ### Reiterative tickets
+
 , users_tickets as (
 SELECT
     distinct account_id, 
@@ -79,12 +85,14 @@ WHERE
     --- Truckroll
         'Ci: Inst/Tc Status', 'Ci: Install Stat', 'Ci: Installer / Tech', 'Create Trouble Call', 'Cs: Transfer', 'Dialtone/Line Issues', 'Eq: Not Recording', 'Eq: Port Damage', 'Eq: Ref By Tech/Inst', 'Eq: Vod No Access', 'Eq:error E1:26 E1:36', 'Equipment Problem', 'Equipment Swap', 'Fiber Outages', 'Maintenance Techs', 'Provision/Contractor', 'Sl: New Sales', 'Sl: Upgrade HSD A/O', 'Sp: Already Had Tc', 'Sp: Cancelled Tc', 'Sp: Drops Issues', 'Sp: HSD-Intermit.', 'Sp: HSD-No Browse', 'Sp: HSD-No Connect', 'Sp: HSD-Speed Issues', 'Sp: No Signal-3 Pack', 'Sp: Pending Mr-Sro', 'Sp: Poste Ca?-do', 'Sp: Poste Cado', 'Sp: PPV', 'Sp: Precortes Issues', 'Sp: Recent Install', 'Sp: Referred To Noc', 'Sp: Tel-Cant Make', 'Sp: Tel-Cant Receive', 'Sp: Tel-No Tone', 'Sp: Video-Intermit.', 'Sp: Video-No Signal', 'Sp: Video-Tiling', 'Sp: Vod', 'Sp:hsd- Ip Issues', 'Sp:hsd- Wifi Issues', 'Sp:tc/Mr Confirm', 'Sp:tel- Voice Mail', 'Status Of Install', 'Status/Trouble Calls', 'Tel Issues', 'Tel Problem', 'Telephony Calls', 'Transfer', 'Vd: Transferred')
 )
+
 , last_ticket as (
 SELECT 
     account_id as last_account, 
     first_value(interaction_date) over(partition by account_id, date_trunc('month', interaction_date) order by interaction_date desc) as last_interaction_date
 FROM users_tickets
 )
+
 , join_last_ticket as (
 SELECT
     account_id, 
@@ -95,7 +103,9 @@ SELECT
     date_add('day', -60, last_interaction_date) as window_day
 FROM users_tickets W
 INNER JOIN last_ticket L
-    ON W.account_id = L.last_account)
+    ON W.account_id = L.last_account
+)
+
 , tickets_count as (
 SELECT 
     interaction_month, 
@@ -105,6 +115,7 @@ FROM join_last_ticket
 WHERE interaction_date between window_day and last_interaction_date
 GROUP BY 1, 2
 )
+
 , tickets_tier as (
 SELECT 
     *,
@@ -115,6 +126,7 @@ SELECT
     else null end as ticket_tier
 FROM tickets_count
 )
+
 , tickets_per_month as (
 SELECT
     date_trunc('month', interaction_date) as month, 
@@ -124,7 +136,9 @@ FROM users_tickets
 WHERE interaction_id is not null
 GROUP BY 1, 2
 )
+
 --- ### Reiterative tickets flag
+
 , ticket_tier_flag as (
 SELECT 
     F.*, 
@@ -134,6 +148,7 @@ FROM fmc_table_adj F
 LEFT JOIN tickets_tier I
     ON cast(F.fix_s_att_account as varchar) = cast(I.account_id as varchar) and F.fix_s_dim_month = I.interaction_month
 )
+
 , final_fields as (
 SELECT
     distinct fix_s_dim_month, -- month
