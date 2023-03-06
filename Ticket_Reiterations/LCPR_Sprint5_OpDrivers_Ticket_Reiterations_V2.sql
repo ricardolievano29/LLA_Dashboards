@@ -191,7 +191,9 @@ SELECT
 FROM final_fields
 -- WHERE ((fix_s_fla_churntype != '2. Fixed Involuntary Churner' and fix_s_fla_churntype != '1. Fixed Voluntary Churner') or fix_s_fla_churntype is null) and fix_s_fla_churntype != 'Fixed Churner'
 GROUP BY 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12
+
 --- ### Specific numbers
+
 -- SELECT
 --   count(distinct fix_s_att_account) as num_clients
 -- FROM final_fields
