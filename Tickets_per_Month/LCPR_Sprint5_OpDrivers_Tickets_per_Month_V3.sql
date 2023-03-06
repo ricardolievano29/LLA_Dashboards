@@ -30,10 +30,10 @@ SELECT
     --- waterfall_flag
     --- finalaccount
     fix_s_att_account, -- fixedaccount
-    fix_e_att_active --- f_activebom
+    fix_b_att_active --- f_activebom
     --- mobile_activeeom
     --- mobilechurnflag
-FROM "db_stage_dev"."lcpr_fixed_table_jan_feb28" --- Make sure the right table is being used accordingly to the month requested.
+FROM "db_stage_dev"."lcpr_fixed_table_jan_mar06" --- Make sure the right table is being used accordingly to the month requested.
 WHERE 
     fix_s_dim_month = (SELECT input_month FROM parameters)
 )
@@ -144,7 +144,9 @@ SELECT
     outages,
     number_tickets
 FROM number_tickets_flag
-WHERE fix_s_fla_churnflag = '2. Fixed NonChurner'
+WHERE 
+    fix_b_att_active = 1
+    and fix_s_fla_churnflag = '2. Fixed NonChurner'
 )
 
 SELECT
