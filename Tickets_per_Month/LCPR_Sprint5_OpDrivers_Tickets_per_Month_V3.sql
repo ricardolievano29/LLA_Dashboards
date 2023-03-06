@@ -30,7 +30,7 @@ SELECT
     --- waterfall_flag
     --- finalaccount
     fix_s_att_account, -- fixedaccount
-    fix_b_att_active --- f_activebom
+    fix_e_att_active --- f_activebom -- I actually take EOM
     --- mobile_activeeom
     --- mobilechurnflag
 FROM "db_stage_dev"."lcpr_fixed_table_jan_mar06" --- Make sure the right table is being used accordingly to the month requested.
@@ -145,8 +145,8 @@ SELECT
     number_tickets
 FROM number_tickets_flag
 WHERE 
-    fix_b_att_active = 1
-    and fix_s_fla_churnflag = '2. Fixed NonChurner'
+    fix_e_att_active = 1
+    -- and fix_s_fla_churnflag = '2. Fixed NonChurner'
 )
 
 SELECT
