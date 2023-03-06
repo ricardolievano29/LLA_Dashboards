@@ -190,7 +190,9 @@ SELECT
     count(distinct tickets) as Userstickets
 FROM final_fields
 GROUP BY 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12
+
 --- ### Specific numbers
+
 -- SELECT
 --   count(distinct fix_s_att_account) as num_clients
 -- FROM final_fields
