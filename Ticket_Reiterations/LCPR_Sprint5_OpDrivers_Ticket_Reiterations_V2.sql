@@ -127,22 +127,11 @@ SELECT
 FROM tickets_count
 )
 
-, tickets_per_month as (
-SELECT
-    date_trunc('month', interaction_date) as month, 
-    account_id, 
-    count(interaction_date) as number_tickets
-FROM users_tickets
-WHERE interaction_id is not null
-GROUP BY 1, 2
-)
-
 --- ### Reiterative tickets flag
 
 , ticket_tier_flag as (
 SELECT 
     F.*, 
-    case when I.account_id is not null then fix_s_att_account else null end as tickets, --- replace finalaccount (when available) instead of fix_s_att_account
     ticket_tier
 FROM fmc_table_adj F
 LEFT JOIN tickets_tier I
@@ -172,7 +161,6 @@ SELECT
     ticket_tier,
    -- finalaccount
     fix_s_att_account, -- fixedaccount
-    tickets,
     records_per_user
 FROM ticket_tier_flag
 WHERE 
@@ -180,31 +168,30 @@ WHERE
   and fix_e_att_active = 1
 )
 
-SELECT
-    fix_s_dim_month, -- month
-    fix_b_fla_tech, -- B_Final_TechFlag
-    fix_b_fla_fmc, -- B_FMCSegment
-    fix_b_fla_mixcodeadj, -- B_FMCType
-    fix_e_fla_tech, -- E_Final_TechFlag
-    fix_e_fla_fmc, -- E_FMCSegment
-    fix_e_fla_mixcodeadj, -- E_FMCType
-    -- b_final_tenure
-    -- e_final_tenure
-    fix_b_fla_tenure, -- B_FixedTenure
-    fix_e_fla_tenure, -- E_FixedTenure
-    -- finalchurnflag
-    -- fixedchurnflag
-    fix_s_fla_churntype, -- fixedchurntype
-    fix_s_fla_mainmovement, -- fixedmainmovement
-    -- waterfall_flag
-    -- mobile_activeeom
-    -- mobilechurnflag
-    ticket_tier,
-    count(distinct fix_s_att_account) as Total_Accounts,
-    count(distinct fix_s_att_account) as Fixed_Accounts, 
-    count(distinct tickets) as Userstickets
-FROM final_fields
-GROUP BY 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12
+-- SELECT
+--     fix_s_dim_month, -- month
+--     fix_b_fla_tech, -- B_Final_TechFlag
+--     fix_b_fla_fmc, -- B_FMCSegment
+--     fix_b_fla_mixcodeadj, -- B_FMCType
+--     fix_e_fla_tech, -- E_Final_TechFlag
+--     fix_e_fla_fmc, -- E_FMCSegment
+--     fix_e_fla_mixcodeadj, -- E_FMCType
+--     -- b_final_tenure
+--     -- e_final_tenure
+--     fix_b_fla_tenure, -- B_FixedTenure
+--     fix_e_fla_tenure, -- E_FixedTenure
+--     -- finalchurnflag
+--     -- fixedchurnflag
+--     fix_s_fla_churntype, -- fixedchurntype
+--     fix_s_fla_mainmovement, -- fixedmainmovement
+--     -- waterfall_flag
+--     -- mobile_activeeom
+--     -- mobilechurnflag
+--     ticket_tier,
+--     count(distinct fix_s_att_account) as Total_Accounts,
+--     count(distinct fix_s_att_account) as Fixed_Accounts
+-- FROM final_fields
+-- GROUP BY 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12
 
 --- ### Specific numbers
 
@@ -212,3 +199,9 @@ GROUP BY 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12
 --   count(distinct fix_s_att_account) as num_clients
 -- FROM final_fields
 -- WHERE ticket_tier = '1'
+
+SELECT 
+    distinct ticket_tier,
+    count(distinct fix_s_att_account) as num_clients
+FROM final_fields
+GROUP BY 1
