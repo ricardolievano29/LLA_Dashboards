@@ -179,7 +179,9 @@ SELECT
     tickets,
     records_per_user
 FROM ticket_tier_flag
-WHERE fix_b_att_active = 1
+WHERE 
+  fix_s_fla_churnflag = '2. Fixed NonChurner'
+  and fix_b_att_active = 1
 )
 
 SELECT
