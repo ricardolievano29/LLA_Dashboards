@@ -98,9 +98,9 @@ SELECT
     account_id, 
     outages,
     --- ### Option 1: distinct interaction_date
-    count(distinct interaction_date) as number_tickets
+    -- count(distinct interaction_date) as number_tickets
     --- ### Option 2: Non-distinct interaction_date
-    -- count(interaction_date) as number_tickets
+    count(interaction_date) as number_tickets
 FROM users_tickets
 WHERE interaction_id is not null
 GROUP BY 1, 2, 3
