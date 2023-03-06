@@ -146,7 +146,7 @@ SELECT
 FROM number_tickets_flag
 WHERE 
     fix_e_att_active = 1
-    -- and fix_s_fla_churnflag = '2. Fixed NonChurner'
+    and fix_s_fla_churnflag = '2. Fixed NonChurner'
 )
 
 SELECT
