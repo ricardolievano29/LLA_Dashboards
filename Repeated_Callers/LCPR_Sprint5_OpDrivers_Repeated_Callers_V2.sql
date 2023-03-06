@@ -33,7 +33,7 @@ SELECT
     fix_e_att_active --- f_activebom
     --- mobile_activeeom
     --- mobilechurnflag
-FROM "db_stage_dev"."lcpr_fixed_table_dec_mar06" --- Keep this updated to the lastest version!
+FROM "db_stage_dev"."lcpr_fixed_table_jan_mar06" --- Keep this updated to the lastest version!
 WHERE 
     fix_s_dim_month = (SELECT input_month FROM parameters)
 )
