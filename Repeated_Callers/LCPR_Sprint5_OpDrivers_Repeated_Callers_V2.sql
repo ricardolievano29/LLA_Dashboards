@@ -30,7 +30,7 @@ SELECT
     --- waterfall_flag
     --- finalaccount
     fix_s_att_account, -- fixedaccount
-    fix_b_att_active --- f_activebom
+    fix_e_att_active --- f_activebom
     --- mobile_activeeom
     --- mobilechurnflag
 FROM "db_stage_dev"."lcpr_fixed_table_dec_mar06" --- Keep this updated to the lastest version!
@@ -159,7 +159,7 @@ SELECT
     records_per_user
 FROM interaction_tier_flag
 WHERE fix_s_fla_churnflag = '2. Fixed NonChurner'
-    and fix_b_att_active = 1
+    and fix_e_att_active = 1
 )
 
 SELECT
