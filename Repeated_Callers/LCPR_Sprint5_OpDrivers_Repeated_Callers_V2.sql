@@ -5,7 +5,7 @@
 WITH
   
  parameters as (
- SELECT date_trunc('month', date('2022-12-01')) as input_month --- Input month you wish the code run for
+ SELECT date_trunc('month', date('2023-01-01')) as input_month --- Input month you wish the code run for
  )
 
 
@@ -184,6 +184,7 @@ FROM final_fields
 GROUP BY 1, 2, 3, 4, 5, 6, 7, 8, 9, 10
 
 --- ### Specific numbers
+
 -- SELECT
 --     count(distinct fix_s_att_account) as num_cliets
 -- FROM final_fields
