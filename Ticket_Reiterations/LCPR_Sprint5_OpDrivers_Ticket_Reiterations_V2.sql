@@ -1,8 +1,30 @@
 --- ##### LCPR SPRINT 5  OPERATIONAL DRIVERS - TICKET REITERATIONS #####
-
 --- ### Initial steps
-
-	@@ -33,7 +33,7 @@ SELECT
+WITH
+  
+ parameters as (
+ SELECT date_trunc('month', date('2023-01-01')) as input_month --- Input month you wish the code run for
+ )
+, fmc_table as ( --- This actually is the Fixed Table, it is called fmc just to get ready for when that table is ready
+SELECT
+    fix_s_dim_month, --- month
+    fix_b_fla_tech, --- B_Final_TechFlag
+    fix_b_fla_fmc, --- B_FMCSegment
+    fix_b_fla_mixcodeadj, --- B_FMCType
+    fix_e_fla_tech, --- E_Final_Tech_Flag
+    fix_e_fla_fmc, --- E_FMCSegment
+    fix_e_fla_mixcodeadj, --- E_FMCType
+    fix_b_fla_tenure, -- b_final_tenure
+    fix_e_fla_tenure, --- e_final_tenure
+    --- B_FixedTenure
+    --- E_FixedTenure
+    --- finalchurnflag
+    fix_s_fla_churntype, --- fixedchurntype
+    fix_s_fla_churnflag, --- fixedchurnflag
+    fix_s_fla_mainmovement, --- fixedmainmovement
+    --- waterfall_flag
+    --- finalaccount
+    fix_s_att_account, -- fixedaccount
     fix_b_att_active --- f_activebom
     --- mobile_activeeom
     --- mobilechurnflag
@@ -10,12 +32,40 @@ FROM "db_stage_dev"."lcpr_fixed_table_jan_mar06" --- Keep this updated to the la
 WHERE 
     fix_s_dim_month = (SELECT input_month FROM parameters)
 )
-	@@ -75,81 +75,60 @@ SELECT
+, repeated_accounts as (
+SELECT 
+    fix_s_dim_month, 
+    fix_s_att_account, 
+    count(*) as records_per_user
+FROM fmc_table
+GROUP BY 1, 2
+ORDER BY 3 desc
+)
+, fmc_table_adj as (
+SELECT 
+    F.*,
+    records_per_user
+FROM fmc_table F
+LEFT JOIN repeated_accounts R
+    ON F.fix_s_att_account = R.fix_s_att_account and F.fix_s_dim_month = R.fix_s_dim_month
+)
+, clean_interaction_time as (
+SELECT *
+FROM "lcpr.stage.prod"."lcpr_interactions_csg"
+WHERE
+    (cast(interaction_start_time as varchar) != ' ') 
+    and (interaction_start_time is not null)
+    and date_trunc('month', cast(substr(cast(interaction_start_time as varchar),1,10) as date)) between ((SELECT input_month FROM parameters)) and ((SELECT input_month FROM parameters) + interval '1' month)
+    and account_type = 'RES'
+)
+, interactions_fields as (
+SELECT
+    *, 
+    cast(substr(cast(interaction_start_time as varchar), 1, 10) as date) as interaction_date, 
+    date_trunc('month', cast(substr(cast(interaction_start_time as varchar), 1, 10) as date)) as month
 FROM clean_interaction_time
 )
-
 --- ### Reiterative tickets
-
 , users_tickets as (
 SELECT
     distinct account_id, 
@@ -29,14 +79,12 @@ WHERE
     --- Now truckroll ones
         'Ci: Inst/Tc Status', 'Ci: Install Stat', 'Ci: Installer / Tech', 'Create Trouble Call', 'Cs: Transfer', 'Dialtone/Line Issues', 'Eq: Not Recording', 'Eq: Port Damage', 'Eq: Ref By Tech/Inst', 'Eq: Vod No Access', 'Eq:error E1:26 E1:36', 'Equipment Problem', 'Equipment Swap', 'Fiber Outages', 'Maintenance Techs', 'Provision/Contractor', 'Sl: New Sales', 'Sl: Upgrade HSD A/O', 'Sp: Already Had Tc', 'Sp: Cancelled Tc', 'Sp: Drops Issues', 'Sp: HSD-Intermit.', 'Sp: HSD-No Browse', 'Sp: HSD-No Connect', 'Sp: HSD-Speed Issues', 'Sp: No Signal-3 Pack', 'Sp: Pending Mr-Sro', 'Sp: Poste Ca?-do', 'Sp: Poste Cado', 'Sp: PPV', 'Sp: Precortes Issues', 'Sp: Recent Install', 'Sp: Referred To Noc', 'Sp: Tel-Cant Make', 'Sp: Tel-Cant Receive', 'Sp: Tel-No Tone', 'Sp: Video-Intermit.', 'Sp: Video-No Signal', 'Sp: Video-Tiling', 'Sp: Vod', 'Sp:hsd- Ip Issues', 'Sp:hsd- Wifi Issues', 'Sp:tc/Mr Confirm', 'Sp:tel- Voice Mail', 'Status Of Install', 'Status/Trouble Calls', 'Tel Issues', 'Tel Problem', 'Telephony Calls', 'Transfer', 'Vd: Transferred')
 )
-
 , last_ticket as (
 SELECT 
     account_id as last_account, 
     first_value(interaction_date) over(partition by account_id, date_trunc('month', interaction_date) order by interaction_date desc) as last_interaction_date
 FROM users_tickets
 )
-
 , join_last_ticket as (
 SELECT
     account_id, 
@@ -48,7 +96,6 @@ SELECT
 FROM users_tickets W
 INNER JOIN last_ticket L
     ON W.account_id = L.last_account)
-
 , tickets_count as (
 SELECT 
     interaction_month, 
@@ -58,7 +105,6 @@ FROM join_last_ticket
 WHERE interaction_date between window_day and last_interaction_date
 GROUP BY 1, 2
 )
-
 , tickets_tier as (
 SELECT 
     *,
@@ -69,7 +115,6 @@ SELECT
     else null end as ticket_tier
 FROM tickets_count
 )
-
 , tickets_per_month as (
 SELECT
     date_trunc('month', interaction_date) as month, 
@@ -79,9 +124,7 @@ FROM users_tickets
 WHERE interaction_id is not null
 GROUP BY 1, 2
 )
-
 --- ### Reiterative tickets flag
-
 , ticket_tier_flag as (
 SELECT 
     F.*, 
@@ -91,8 +134,23 @@ FROM fmc_table_adj F
 LEFT JOIN tickets_tier I
     ON cast(F.fix_s_att_account as varchar) = cast(I.account_id as varchar) and F.fix_s_dim_month = I.interaction_month
 )
-
-	@@ -173,15 +152,15 @@ SELECT
+, final_fields as (
+SELECT
+    distinct fix_s_dim_month, -- month
+    fix_b_fla_tech, -- B_Final_TechFlag
+    fix_b_fla_fmc, -- B_FMCSegment
+    fix_b_fla_mixcodeadj, -- B_FMCType
+    fix_e_fla_tech, -- E_Final_TechFlag
+    fix_e_fla_fmc, -- E_FMCSegment
+    fix_e_fla_mixcodeadj, -- E_FMCType
+    -- b_final_tenure
+    -- e_final_tenure
+    fix_b_fla_tenure, -- B_FixedTenure
+    fix_e_fla_tenure, -- E_FixedTenure
+    -- finalchurnflag
+    -- fixedchurnflag
+    fix_s_fla_churntype, -- fixedchurntype
+    fix_s_fla_mainmovement, -- fixedmainmovement
     -- waterfall_flag
     -- mobile_activeeom
     -- mobilechurnflag
@@ -108,7 +166,16 @@ WHERE
 )
 
 SELECT
-	@@ -198,23 +177,16 @@ SELECT
+    fix_s_dim_month, -- month
+    fix_b_fla_tech, -- B_Final_TechFlag
+    fix_b_fla_fmc, -- B_FMCSegment
+    fix_b_fla_mixcodeadj, -- B_FMCType
+    fix_e_fla_tech, -- E_Final_TechFlag
+    fix_e_fla_fmc, -- E_FMCSegment
+    fix_e_fla_mixcodeadj, -- E_FMCType
+    -- b_final_tenure
+    -- e_final_tenure
+    fix_b_fla_tenure, -- B_FixedTenure
     fix_e_fla_tenure, -- E_FixedTenure
     -- finalchurnflag
     -- fixedchurnflag
@@ -124,10 +191,7 @@ SELECT
 FROM final_fields
 -- WHERE ((fix_s_fla_churntype != '2. Fixed Involuntary Churner' and fix_s_fla_churntype != '1. Fixed Voluntary Churner') or fix_s_fla_churntype is null) and fix_s_fla_churntype != 'Fixed Churner'
 GROUP BY 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12
-
-
 --- ### Specific numbers
-
 -- SELECT
 --   count(distinct fix_s_att_account) as num_clients
 -- FROM final_fields
