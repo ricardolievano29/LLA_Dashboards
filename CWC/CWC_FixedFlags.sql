@@ -460,6 +460,103 @@ WHERE ChurnerType = '1. Fixed Voluntary Churner'
 GROUP BY Month, act_acct_cd, ChurnerType, ChurnTenureDays
 )
 
-SELECT * FROM VoluntaryChurners LIMIT 100
-
 --- ##### Involuntary Churners #####
+
+, Customers_FirstLast_Record as (
+SELECT
+    distinct date_trunc('month', date(dt)) as Month, 
+    act_acct_cd as Account, 
+    min(dt) as FirstCustRecord, 
+    max(dt) as LastCustRecord, 
+    try(filter(array_agg(cast(fi_outst_age as int) order by dt desc), x->x != -1)[1]) as fi_outst_age_v2
+FROM UsefulFields
+GROUP BY 1, 2
+)
+
+, No_Overdue as (
+SELECT
+    distinct date_trunc('month', date(dt)) as Month, 
+    act_acct_cd as Account, 
+    fi_outst_age
+FROM UsefulFields t
+INNER JOIN Customers_FirstLast_Record r
+    ON t.dt = r.FirstCustRecord and r.account = t.act_acct_cd
+WHERE cast(fi_outst_age as double) <= 90
+GROUP BY 1, 2, fi_outst_age
+)
+
+, OverdueLastDay as (
+SELECT
+    distinct date_trunc('month', date(dt)) as Month, 
+    act_acct_cd as Account, 
+    fi_outst_age, 
+    (date_diff('day', date(MaxStart), date(dt))) as ChurnTenureDays
+FROM UsefulFields t
+INNER JOIN Customers_FirstLast_Record r
+    ON t.dt = r.LastCustRecord and r.Account = t.act_acct_cd
+WHERE cast(fi_outst_age as double) >= 90 or (fi_outst_age_v2 >= 90 and date(LastCustRecord) < date_trunc('month', date(dt)) + interval '1' month - interval '1' day)
+GROUP BY 1, 2, fi_outst_age, 4
+)
+
+, InvoluntaryNetChurners as (
+SELECT 
+    distinct n.Month as Month, 
+    n.Account, 
+    l.ChurnTenureDays
+FROM No_Overdue n
+INNER JOIN OverdueLastDay l
+    ON n.account = l.account and n.Month = l.Month
+)
+
+, InvoluntaryChurners as (
+SELECT 
+    distinct Month, 
+    cast(Account as varchar) as Account, 
+    ChurnTenureDays, 
+    case when Account is not null then '2. Fixed Involuntary Churner' end as ChurnerType
+FROM InvoluntaryNetChurners
+GROUP BY Month, 2, 4, ChurnTenureDays
+)
+
+--- ##### Voluntary and Involuntary Churners #####
+
+, AllChurners as (
+SELECT 
+    distinct Month, 
+    Account, 
+    ChurnerType, 
+    ChurnTenureDays
+FROM (
+    SELECT 
+        Month, 
+        Account, 
+        ChurnerType, 
+        ChurnTenureDays
+    FROM (
+        SELECT Month, Account, ChurnerType, ChurnTenureDays 
+        FROM VoluntaryChurners a 
+        UNION ALL 
+            SELECT MONTH, Account, ChurnerType, ChurnTenureDays 
+            FROM InvoluntaryChurners b)
+        )
+    
+)
+
+, FixedBase_AllFlags as (
+SELECT
+    s.*, 
+    case when c.account is not null then '1. Fixed Churner' else '2. Non-churner' end as FixedChurnFlag, 
+    case when c.account is not null then ChurnerType else '2. Non-churners' end as FixedChurnTypeFlag, 
+    ChurnTenureDays, 
+    case 
+        when ChurnTenureDays <= 180 then '0. Early-tenure Churner'
+        when ChurnTenureDays > 180 and ChurnTenureDays <= 360 then '1. Mid-tenure Churner'
+        when ChurnTenureDays > 360 then '2. Late-tenure churner'
+        when ChurnTenureDays is null then '3. Non-Churner'
+    end as ChurnTenureSegment
+FROM SpinMovementBase s
+LEFT JOIN AllChurners c
+    ON cast(s.Fixed_Account as bigint) = cast(c.Account as bigint) and s.Fixed_Month = c.Month
+)
+
+SELECT * FROM AllChurners LIMIT 10
