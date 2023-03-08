@@ -117,7 +117,7 @@ SELECT
         when (NumBB = 1 and NumTV = 0 and NumVO = 0) or (NumBB = 0 and NumTV = 1 and NumVO = 0) and (NumBB = 0 and NumTV = 0 and NumVO = 1) then '1P'
         when (NumBB = 1 and NumTV = 1 and NumVO = 0) or (NumBB = 1 and NumTV = 0 and NumVO = 1) and (NumBB = 0 and NumTV = 1 and NumVO = 1) then '2P'
         when (NumBB = 1 and NumTV = 1 and NumVO = 1) then '3P'
-    end as B_Mix_Code_Adj, 
+    end as B_MixCode_Adj, 
     mrc_amt as B_MRC, 
     fi_outst_age as B_OutstAge, 
     fi_tot_srv_chrg_amt as B_MRCAdj, 
@@ -174,7 +174,7 @@ SELECT
         when (NumBB = 1 and NumTV = 0 and NumVO = 0) or (NumBB = 0 and NumTV = 1 and NumVO = 0) and (NumBB = 0 and NumTV = 0 and NumVO = 1) then '1P'
         when (NumBB = 1 and NumTV = 1 and NumVO = 0) or (NumBB = 1 and NumTV = 0 and NumVO = 1) and (NumBB = 0 and NumTV = 1 and NumVO = 1) then '2P'
         when (NumBB = 1 and NumTV = 1 and NumVO = 1) then '3P'
-    end as E_Mix_Code_Adj, 
+    end as E_MixCode_Adj, 
     mrc_amt as E_mrc, 
     fi_outst_age as E_OutstAge, 
     fi_tot_srv_chrg_amt as E_MRCAdj, 
@@ -199,4 +199,267 @@ GROUP BY
     1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 15, 16, 17, 18, 19, 20, 21, 22, 12, 22, 23, 24, 13, 14, 25, 26, 27, 28, 29, 30
 )
 
-SELECT * FROM ActiveUsersEOM LIMIT 100
+, CustomerBase as (
+SELECT distinct
+    case 
+        when (accountBOM is not null and accountEOM is not null) OR (accountBOM is not null and accountEOM is null) then b.Month
+        when (accountBOM is null and accountEOM is not null) then e.Month
+    end as Fixed_Month, 
+    case
+        when (accountBOM is not null and accountEOM is not null) or (accountBOM is not null and accountEOM is null) then accountBOM
+        when (accountBOM is null and accountEOM is not null) then accountEOM
+    end as Fixed_Account, 
+    case
+        when (accountBOM is not null and accountEOM is not null) or (accountBOM is not null and accountEOM is null) then phoneBOM1
+        when (accountBOM is null and accountEOM is not null) then phoneEOM1
+    end as f_contactphone1, 
+    case
+        when (accountBOM is not null and accountEOM is not null) or (accountBOM is not null and accountEOM is null) then phoneBOM2
+        when (accountBOM is null and accountEOM is not null) then phoneEOM2
+    end as f_contactphone2, 
+    case
+        when (accountBOM is not null and accountEOM is not null) or (accountBOM is not null and accountEOM is null) then phoneBOM3
+        when (accountBOM is null and accountEOM is not null) then phoneEOM2
+    end as f_contactphone3, 
+    case when accountBOM is not null then 1 else 0 end as ActiveBOM, 
+    case when accountEOM is not null then 1 else 0 end as ActiveEOM, 
+    B_Date, 
+    B_Tech_Type, 
+    B_MixCode, 
+    B_MixCode_Adj, 
+    B_MixName, 
+    B_MixName_Adj, 
+    B_ProdBBName, 
+    B_ProdTVName, 
+    B_ProdVoName, 
+    BB_RGU_BOM, 
+    TV_RGU_BOM, 
+    VO_RGU_BOM 
+    B_NumRGUs, 
+    B_bundlecode, 
+    B_bundlename, 
+    B_MRC, 
+    B_OutstAge, 
+    B_MRCAdj, 
+    B_MRCBB, 
+    B_MRCTV, 
+    B_MRCVO, 
+    B_Avg_MRC, 
+    B_Avg_Bill1, 
+    B_Avg_Bill0, 
+    B_MaxStart, 
+    date_diff('day', date(B_MaxStart), date(B_Date)) as B_TenureDays,
+    case 
+        when date_diff('day', date(B_MaxStart), date(B_Date)) <= 180 then 'Early-Tenure'
+        when date_diff('day', date(B_MaxStart), date(B_Date)) > 180 and date_diff('day', date(B_MaxStart), date(B_date)) <= 360 then 'Mid-Tenure'
+        when date_diff('day', date(B_MaxStart), date(B_Date)) > 360 then 'Late-Tenure'
+    end as B_FixedTenureSegment, 
+    E_Date, 
+    E_Tech_Type, 
+    E_MixCode, 
+    E_MixCode_Adj, 
+    E_MixName, 
+    E_MixName_Adj, 
+    E_ProdBBName, 
+    E_ProdTVName, 
+    E_ProdVoName, 
+    BB_RGU_EOM, 
+    TV_RGU_EOM, 
+    VO_RGU_EOM 
+    E_NumRGUs, 
+    E_bundlecode, 
+    E_bundlename, 
+    case when (E_MRC = 0 or E_MRC is null) then B_MRC else E_MRC end as E_MRC, 
+    E_OutstAge, 
+    E_MRCAdj, 
+    E_MRCBB, 
+    E_MRCTV, 
+    E_MRCVO, 
+    E_Avg_MRC, 
+    E_Avg_Bill1, 
+    E_Avg_Bill0, 
+    E_MaxStart,
+    date_diff('day', date(E_MaxStart), date(E_Date)) as E_TenureDays, 
+    case 
+        when date_diff('day', date(E_MaxStart), date(E_Date)) <= 180 then 'Early-Tenure'
+        when date_diff('day', date(E_MaxStart), date(E_Date)) > 180 and date_diff('day', date(E_MaxStart), date(E_date)) <= 360 then 'Mid-Tenure'
+        when date_diff('day', date(E_MaxStart), date(E_Date)) > 360 then 'Late-Tenure'
+    end as E_FixedTenureSegment, 
+    last_rgus
+FROM ActiveUsersBOM b
+FULL OUTER JOIN ActiveUsersEOM e
+    ON b.accountBOM = e.accountEOM and b.Month = e.Month
+ORDER BY Fixed_Account
+)
+
+, MainMovementBase as (
+SELECT
+    a.*, 
+    (E_MRC - B_MRC) as MRCDiff, 
+    case
+        when (cast(E_NumRGUs as int) - cast(B_NumRGUs as int)) = 0 then '1.SameRGUS'
+        when (cast(E_NumRGUs as int) - cast(B_NumRGUs as int)) > 0 then '2.Upsell'
+        when (cast(E_NumRGUs as int) - cast(B_NumRGUs as int)) < 0 then '3.Downsell'
+        when (B_NumRGUs is null and cast(E_NumRGUs as int) > 0 and date_trunc('month', date(E_MaxStart)) = date('2022-11-01')) then '4.New Customer'
+        when (B_NumRGUs is null and cast(E_NumRGUs as int) > 0 and date_trunc('month', date(E_MaxStart)) != date('2022-11-01')) then '5.Come Back to Life'
+        when (cast(B_NumRGUs as int) > 0 and E_NumRGUs is null) then '6.Null last day'
+        when (B_NumRGUs is null and E_NumRGUs is null) then '7.Always null'
+    end as mainmovement_raw
+FROM CustomerBase a
+)
+
+, SpinMovementBase as (
+SELECT
+    *, 
+    case
+        when mainmovement_raw = '1.SameRGUs' and (E_MRC - B_MRC) > 0 then '1. Up-spin'
+        when mainmovement_raw = '1.SameRGUs' and (E_MRC - B_MRC) < 0 THEN '2. Down-spin'
+        else '3. No Spin'
+    end as SpinMovement
+FROM MainMovementBase
+)
+
+--- ### ### ### ### ### Fixed Churn Flags ### ### ### ### ###
+
+, panel_so as ( --- Service Orders Panel
+SELECT
+    account_id, 
+    order_id, 
+    case when max(lob_vo_count) > 0 and max(cease_reason_group) = 'Voluntary' and order_type = 'DEACTIVATION' then 1 else 0 end as vol_lob_vo_count, 
+    case when max(lob_bb_count) > 0 and max(cease_reason_group) = 'Voluntary' and order_type = 'DEACTIVATION' then 1 else 0 end as vol_lob_bb_count, 
+    case when max(lob_tv_count) > 0 and max(cease_reason_group) = 'Voluntary' and order_type = 'DEACTIVATION' then 1 else 0 end as vol_lob_tv_count, 
+    date_trunc('month', completed_date) as completed_month, 
+    completed_date, 
+    cease_reason_group, 
+    org_cntry, 
+    order_status, 
+    network_type, 
+    order_type, 
+    account_type, 
+    lob_VO_count, 
+    lob_BB_count, 
+    lob_TV_count, 
+    customer_id
+FROM (
+    SELECT *
+    FROM "db-stage-dev"."so_hdr_cwc"
+    WHERE 
+        org_cntry = 'Jamaica'
+        and (cease_reason_group in ('Voluntary', 'Customer Service Transaction', 'Involuntary') or cease_reason_group is null)
+        and (network_type not in ('LTE', 'MOBILE') or network_type is null)
+        and order_status = 'COMPLETED' 
+        and account_type = 'Residential'
+    )
+GROUP BY account_id, order_id, lob_vo_count, lob_bb_count, lob_tv_count, date_trunc('month', completed_date), completed_date, customer_id, cease_reason_group, org_cntry, order_status, network_type, order_type, account_type
+ORDER BY completed_month, account_id, order_id
+)
+
+--- ##### Voluntary Churners #####
+
+--- Voluntary churners base
+
+, volchurners_so as (
+SELECT 
+    *, 
+    case when lob_vo_count > 0 then 1 else 0 end as VO_Churn, 
+    case when lob_BB_count > 0 then 1 else 0 end as BB_Churn, 
+    case when lob_TV_count > 0 then 1 else 0 end as TV_Churn
+FROM panel_so
+WHERE
+    org_cntry = 'Jamaica'
+    and cease_reason_group in ('Voluntary')
+    and network_type not in ('LTE', 'MOBILE')
+    and order_status = 'COMPLETED'
+    and account_type = 'Residential'
+)
+
+--- Number of churned RGUs on the maximun date - it doesn't consider mobile
+
+, ChurnedRGUs_so as (
+SELECT
+    *, 
+    (VO_Churn + BB_Churn + TV_Churn) as ChurnedRGUs
+FROM volchurners_so
+)
+
+--- Number of RGUs a customer has on the last record of the month
+
+, RGUsLastRecordDNA as (
+SELECT
+    distinct date_trunc('month', date(dt)) as Month, 
+    act_acct_cd, 
+    cst_cust_cd, 
+    case 
+        when last_value(pd_mix_nm) over (partition by act_acct_cd, date_trunc('month', date(dt)) order by dt) in ('VO', 'BO', 'TV') then 1
+        when last_value(pd_mix_nm) over (partition by act_acct_cd, date_trunc('month', date(dt)) order by dt) in ('BO+VO', 'BO+TV', 'VO+TV') then 2
+        when last_value(pd_mix_nm) over (partition by act_acct_cd, date_trunc('month', date(dt)) order by dt) in ('BO+VO+TV') then 3
+        else 0
+    end as NumRGUsLastRecord
+FROM UsefulFields
+WHERE (cast(fi_outst_age as double) <= 90 or fi_outst_age is null)
+ORDER BY act_acct_cd
+)
+
+--- Date of the last record of the month per customer
+
+, LastRecordDateDNA as (
+SELECT
+    distinct date_trunc('month', date(dt)) as Month, 
+    act_acct_cd, 
+    max(dt) as LastDate, 
+    cst_cust_cd
+FROM Usefulfields
+WHERE (cast(fi_outst_age as double) <= 90 or fi_outst_age is null) --- Users with Hard Dx are omitted
+GROUP BY 1, act_acct_cd, cst_cust_cd
+ORDER BY act_acct_cd
+)
+
+--- Number of outstanding days on the last record data
+
+, OverdueLastRecordDNA as (
+SELECT
+    distinct date_trunc('month', date(dt)) as Month, 
+    t.act_acct_cd, 
+    fi_outst_age as LastOverdueRecord, 
+    t.cst_cust_cd, 
+    (date_diff('day', date(dt), date(MaxStart))) as ChurnTenureDays
+FROM UsefulFields t
+INNER JOIN LastRecordDateDNA d
+    ON t.act_acct_cd = d.act_acct_cd and t.dt = d.LastDate
+)
+
+--- Total Voluntary Churners considering number of churned RGUs, outsanding age and churn date
+
+, VoluntaryTotalChurners as (
+SELECT
+    distinct l.Month, 
+    l.act_acct_cd, 
+    d.LastDate, 
+    o.ChurnTenureDays, 
+    case when length(cast(l.act_acct_cd as varchar)) = 12 then '1. Liberate' else '2. Cerilion' end as BillingSystem, 
+    case when (date(d.LastDate) = date_trunc('month', date(d.LastDate)) or date(d.LastDate) = date_trunc('MONTH', date(d.LastDate)) + interval '1' month - interval '1' day) then '1. First/Last Day Churner' else '2. Other Date Churner' end as ChurnDateType, 
+    case when cast(LastOverdueRecord as double) >= 90 then '2. Fixed Mixed Churner' else '1. Fixed Voluntary Churner' end as ChurnerType
+FROM ChurnedRGUs_so v
+INNER JOIN RGUsLastRecordDNA l
+    ON cast(v.customer_id as double) = cast(l.cst_cust_cd as double) and v.ChurnedRGUs >= l.NumRGUslastRecord and date_trunc('month', v.completed_date) = l.Month
+INNER JOIN LastRecordDateDNA d
+    ON cast(l.act_acct_cd as double) = cast(d.act_acct_cd as double) and l.Month = d.Month
+INNER JOIN OverDueLastRecordDNA o
+    ON cast(l.act_acct_cd as double) = cast(o.act_acct_cd as double) and l.Month = o.Month
+WHERE cease_reason_group = 'Voluntary'
+)
+
+, VoluntaryChurners as (
+SELECT 
+    Month, 
+    cast(act_acct_cd as varchar) as Account, 
+    ChurnerType, 
+    ChurnTenureDays
+FROM VoluntaryTotalChurners
+WHERE ChurnerType = '1. Fixed Voluntary Churner'
+GROUP BY Month, act_acct_cd, ChurnerType, ChurnTenureDays
+)
+
+SELECT * FROM VoluntaryChurners LIMIT 100
+
+--- ##### Involuntary Churners #####
