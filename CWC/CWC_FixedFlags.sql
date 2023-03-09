@@ -557,6 +557,159 @@ SELECT
 FROM SpinMovementBase s
 LEFT JOIN AllChurners c
     ON cast(s.Fixed_Account as bigint) = cast(c.Account as bigint) and s.Fixed_Month = c.Month
+) --- Here I got a problem regarding casting accounts
+
+--- ##### Churn Atypical Flags #####
+
+, so_llaflags as (
+SELECT
+    completed_month, 
+    account_id, 
+    sum(vol_lob_vo_count) + sum(vol_lob_bb_count) + sum(vol_lob_tv_count) as vol_churn_rgu, 
+    case when sum(case when cease_reason_group = 'Customer Service Transaction' or (cease_reason_group is null) then 1 else 0 end) > 0 then 1 else 0 end as cst_churn_flag, 
+    case when sum(case when cease_reason_group = 'Involuntary' then 1 else 0 end) > 0 then 1 else 0 end as non_pay_so_flag
+FROM panel_so
+GROUP BY account_id, completed_month
 )
 
-SELECT * FROM AllChurners LIMIT 10
+, join_so_fixedbase as (
+SELECT 
+    a.*, 
+    case 
+        when a.FixedChurnTypeFlag = '1. Fixed Voluntary Churner' and coalesce(cast(e_numrgus as int), 0) > coalesce(cast(b_numrgus as int), 0) then 'Voluntary'
+        when a.mainmovement_raw = '6. Null last day' and a.FixedChurnTypeFlag = '2. Non-churners' and ((B_OutstAge =-1 and length(a.fixed_account) = 12) or ((b.non_pay_so_flag is null) and length(a.fixed_account) = 8)) then 'Incomplete CST'
+        when (b.cst_churn_flag = 1 and a.FixedChurnTypeFlag != '2. Fixed Involuntary Churner' and a.FixedChurnTypeFlag != '1. Fixed Voluntary Churner' and coalesce(cast(B_NumRGUs as int), 0) > coalesce(cast(E_NumRGUs as int), 0)) or a.mainmovement_raw = '3. Downsell' then 'CST Churner'
+        when a.FixedChurnTypeFlag = '2. Fixed Involuntary Churner' then 'Involuntary'
+        when a.FixedChurnTypeFlag = '2. Non-churners' and ActiveEOM = 0 and cast(a.B_OutstAge as integer) < 90 and (b.cst_churn_flag is null) then 'Early Dx'
+    end as FinalFixedChurnFlag
+FROM FixedBase_AllFlags a
+LEFT JOIN so_llaflags b
+    ON a.fixed_account = cast(b.account_id as varchar) and a.fixed_month = b.completed_month
+)
+
+--- ##### Churn Atypical Flags #####
+
+, InactiveUsersMonth as (
+SELECT 
+    distinct Fixed_Month as ExitMonth, 
+    Fixed_Account, 
+    date_add('month', 1, Fixed_Month) as RejoinerMonth
+FROM CustomerBase
+WHERE ActiveBOM = 1 and ActiveEOM = 0
+)
+
+, RejoinersPopulation as (
+SELECT 
+    f.*, 
+    RejoinerMonth, 
+    case when i.Fixed_Account is not null then 1 else 0 end as RejoinerPopFlag, 
+    case when RejoinerMonth >= date('2022-11-01') and rejoinermonth <= date_add('month', 1, date('2022-11-02')) then 1 else 0 end as Fixed_PRMonth
+FROM CustomerBase f
+LEFT JOIN InactiveUsersMonth i
+    ON f.Fixed_Account = i.Fixed_Account and Fixed_Month = ExitMonth
+)
+
+, FixedRejoinerMonthPopulation as (
+SELECT 
+    distinct Fixed_Month, 
+    RejoinerPopFlag, 
+    Fixed_PRMonth, 
+    Fixed_Account, 
+    date('2022-11-01') as Month
+FROM RejoinersPopulation
+WHERE 
+    RejoinerPopFlag = 1
+    and Fixed_PRMonth = 1
+    and Fixed_Month != date('2022-11-01')
+GROUP BY 1, 2, 3, 4
+)
+
+, FullFixedBase_Rejoiners as (
+SELECT 
+    f.*, 
+    Fixed_PRMonth, 
+    case when Fixed_PRMonth = 1 and mainmovement_raw = '5. Come Back to Life' then 1 else 0 end as Fixed_RejoinerMonth, 
+    case when finalfixedchurnflag = 'Involuntary' then '6. Null last day' else mainmovement_raw end as mainmovement, 
+    case when finalfixedchurnflag = 'Involuntary' then 0 else cast(e_numrgus as int) end as e_numrgus_raw
+FROM join_so_fixedbase f
+LEFT JOIN FixedRejoinerMonthPopulation r
+    ON f.Fixed_Account = r.Fixed_Account and f.Fixed_Month = cast(r.Month as date)
+)
+
+SELECT 
+    Fixed_Month, 
+    Fixed_Account, 
+    f_contactphone1, 
+    f_contactphone2, 
+    f_contactphone3, 
+    ActiveBOM, 
+    ActiveEOM, 
+    B_Date, 
+    B_Tech_Type, 
+    B_MixCode, 
+    B_MixCode_Adj, 
+    B_MixName, 
+    B_MixName_Adj, 
+    B_ProdBBName, 
+    B_ProdTVName, 
+    B_ProdVoName, 
+    BB_RGU_BOM, 
+    TV_RGU_BOM, 
+    VO_RGU_BOM, 
+    B_NumRGUs, 
+    B_bundlecode, 
+    B_bundlename, 
+    B_MRC, 
+    B_OutstAge, 
+    B_MRCAdj, 
+    B_MRCBB, 
+    B_MRCTV, 
+    B_MRCVO, 
+    B_Avg_MRC, 
+    B_Avg_MRC, 
+    B_Avg_Bill1, 
+    B_Avg_Bill0, 
+    B_MaxStart, 
+    B_TenureDays, 
+    B_FixedTenureSegment, 
+    E_Date, 
+    E_Tech_Type,
+    E_MixCode_Adj, 
+    E_MixName,	
+    E_MixName_Adj,	
+    E_ProdBBName,	
+    E_ProdTVName,	
+    E_ProdVoName,	
+    BB_RGU_EOM,	
+    TV_RGU_EOM,	
+    VO_RGU_EOM,	
+    cast(E_NumRGUs_raw as int) as E_NumRGUs,	
+    E_bundlecode,	
+    E_bundlename,	
+    E_MRC,	
+    E_OutstAge,	
+    E_MRCAdj,	
+    E_MRCBB,	
+    E_MRCTV,	
+    E_MRCVO,	
+    E_Avg_MRC,	
+    E_Avg_Bill1,	
+    E_Avg_Bill0,	
+    E_MaxStart,	
+    E_TenureDays,	
+    E_FixedTenureSegment,	
+    last_rgus,	
+    MRCDiff,	
+    MainMovement,	
+    SpinMovement,	
+    FixedChurnFlag,	
+    FixedChurnTypeFlag,	
+    ChurnTenureDays,	
+    ChurnTenureSegment,	
+    FinalFixedChurnFlag,	
+    Fixed_PRMonth,	
+    Fixed_RejoinerMonth
+FROM FullFixedBase_Rejoiners
+WHERE fixed_month = date('2022-11-01')
+
+-- SELECT * FROM FullFixedBase_Rejoiners LIMIT 10
