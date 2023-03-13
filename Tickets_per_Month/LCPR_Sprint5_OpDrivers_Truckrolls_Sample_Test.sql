@@ -89,9 +89,10 @@ SELECT
 --     -- ord_rsn_otr, 
 --     -- job_type_description 
 
-    distinct job_type_description, 
+    distinct ord_rsn_desc,
     interaction_purpose_descrip,
-    count(distinct interaction_id)
+    count(distinct interaction_id), 
+    count(distinct order_no_ojb)
     
     
 --     count(distinct account_id), 
@@ -100,7 +101,7 @@ SELECT
 FROM users_tickets a 
 -- FULL OUTER JOIN truckrolls_sample b 
 LEFT JOIN truckrolls_sample b
-    ON a.account_id = b.sub_acct_no_sbb
+    ON a.account_id = b.sub_acct_no_sbb and cast(a.interaction_date as varchar) = b.create_dte_ojb
 GROUP BY 1, 2
 ORDER BY 3 desc
 
