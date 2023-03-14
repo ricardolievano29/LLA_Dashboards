@@ -225,9 +225,10 @@ GROUP BY 1, 2, 3, 4, 5, 6, 7, 8, 9, 10
 
 --- ### KPI calculation
 -- SELECT 
---     sum(num_relevant_tickets) as num_relevant_tickets, 
---     count(distinct fix_s_att_account) as active_base, 
---     round(cast(sum(num_relevant_tickets) as double)/(cast(count(distinct fix_s_att_account) as double)/100), 2) as tickets_per_100_users
+    -- sum(num_relevant_tickets) as num_relevant_tickets, 
+    -- sum(number_tickets) as number_tickets,
+    -- count(distinct fix_s_att_account) as active_base, 
+    -- round(cast(sum(number_tickets) as double)/(cast(count(distinct fix_s_att_account) as double)/100), 2) as tickets_per_100_users
 -- FROM final_fields
 
 --- ### Ticket Equation
