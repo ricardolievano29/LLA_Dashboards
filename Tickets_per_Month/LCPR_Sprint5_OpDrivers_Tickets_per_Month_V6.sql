@@ -111,7 +111,7 @@ SELECT
         or lower(interaction_purpose_descrip) like '%phone%cant%'
         or lower(interaction_purpose_descrip) like '%phone%no%'
         or lower(interaction_purpose_descrip) like '%no%connect%'
-        ot lower(interaction_purpose_descrip) like '%no%conect%'
+        or lower(interaction_purpose_descrip) like '%no%conect%'
         or lower(interaction_purpose_descrip) like '%no%start%'
         or lower(interaction_purpose_descrip) like '%equip%'
         or lower(interaction_purpose_descrip) like '%intermit%'
