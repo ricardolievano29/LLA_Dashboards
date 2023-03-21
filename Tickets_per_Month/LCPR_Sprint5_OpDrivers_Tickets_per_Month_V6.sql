@@ -5,7 +5,7 @@
 WITH
 
  parameters as (
- SELECT date_trunc('month', date('2022-01-01')) as input_month --- Input month you wish the code run for
+ SELECT date_trunc('month', date('2023-01-01')) as input_month --- Input month you wish the code run for
  )
 
 
