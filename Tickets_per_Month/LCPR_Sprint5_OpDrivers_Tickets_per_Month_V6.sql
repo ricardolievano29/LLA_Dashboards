@@ -5,7 +5,7 @@
 WITH
 
  parameters as (
- SELECT date_trunc('month', date('2023-01-01')) as input_month --- Input month you wish the code run for
+ SELECT date_trunc('month', date('2023-02-01')) as input_month --- Input month you wish the code run for
  )
 
 
@@ -33,7 +33,7 @@ SELECT
     fix_e_att_active --- f_activebom
     --- mobile_activeeom
     --- mobilechurnflag
-FROM "db_stage_dev"."lcpr_fixed_table_jan_mar17" --- Make sure the right table is being used accordingly to the month requested.
+FROM "db_stage_dev"."lcpr_fixed_table_feb_mar17" --- Make sure the right table is being used accordingly to the month requested.
 WHERE 
     fix_s_dim_month = (SELECT input_month FROM parameters)
     and fix_e_att_active = 1
@@ -74,7 +74,6 @@ SELECT
     cast(substr(cast(interaction_start_time as varchar), 1, 10) as date) as interaction_date, 
     date_trunc('month', cast(substr(cast(interaction_start_time as varchar), 1, 10) as date)) as month
 FROM clean_interaction_time
--- WHERE account_id = '8211990051973527' --- Just for experiments
 )
 
 --- ### Tickets per month
@@ -97,11 +96,11 @@ SELECT
         or lower(interaction_purpose_descrip) like '%ppv%'
         or lower(interaction_purpose_descrip) like '%solic%'
         ) then interaction_id else null
-    end as techticket_flag, 
+    end as techticket_flag,
     cast(job_no_ojb as varchar) as truckroll_flag
 FROM interactions_fields a
-LEFT JOIN "lcpr.stage.dev"."truckrolls" b 
-    ON a.interaction_date = cast(substr(b.create_dte_ojb, 2, 10) as date) and cast(a.account_id as varchar) = cast(b.sub_acct_no_sbb as varchar)
+LEFT JOIN (SELECT * FROM "lcpr.stage.dev"."truckrolls" WHERE substr(create_dte_ojb, 1, 1) != '"') b 
+    ON a.interaction_date = cast(create_dte_ojb as date) and cast(a.account_id as varchar) = cast(b.sub_acct_no_sbb as varchar)
 WHERE 
     interaction_purpose_descrip not in ('Work Order Status', 'Default Call Wrapup', 'G:outbound Calls', 'Eq: Cust. First', 'Eq: Audit', 'Eq: Code Error', 'Downgrade Service', 'Disconnect Service', 'Rt: Dowgrde Service', 'Cust Service Calls')
 )
