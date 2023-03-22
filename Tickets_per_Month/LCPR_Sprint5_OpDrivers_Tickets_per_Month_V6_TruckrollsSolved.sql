@@ -103,6 +103,15 @@ FROM truckrolls_part1
 UNION ALL (SELECT * FROM truckrolls_part2)
 )
 
+, truckrolls_clean as (
+SELECT *
+FROM truckrolls_union
+WHERE
+    cast(job_no_ojb as varchar) not in ('',  ' ') 
+    and job_no_ojb is not null
+    and date_trunc('month', date(create_dte_ojb)) = (SELECT input_month FROM parameters)
+)
+
 --- ### Tickets per month
 
 , users_tickets as (
@@ -153,7 +162,7 @@ SELECT
     end as techticket_flag,
     cast(job_no_ojb as varchar) as truckroll_flag
 FROM interactions_fields a
-LEFT JOIN truckrolls_union b
+LEFT JOIN truckrolls_clean b
     ON a.interaction_date = cast(create_dte_ojb as date) and cast(a.account_id as varchar) = cast(b.sub_acct_no_sbb as varchar)
 WHERE
     interaction_purpose_descrip not in ('Work Order Status', 'Default Call Wrapup', 'G:outbound Calls', 'Eq: Cust. First', 'Eq: Audit', 'Eq: Code Error', 'Downgrade Service', 'Disconnect Service', 'Rt: Dowgrde Service', 'Cust Service Calls')
