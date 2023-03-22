@@ -155,9 +155,14 @@ SELECT
         or lower(interaction_purpose_descrip) like '%tv%issue%'
         or lower(interaction_purpose_descrip) like '%bloq%'
         or lower(interaction_purpose_descrip) like '%slow%'
-        or lower(interaction_purpose_descrip) like '%service%'
-        or lower(interaction_purpose_descrip) like '%hsd%'
-        or lower(interaction_purpose_descrip) like '%no%browse%'
+        or lower(interaction_purpose_descrip) like '%slow%service%'
+        or lower(interaction_purpose_descrip) like '%service%tech%'
+        or lower(interaction_purpose_descrip) like '%tech%service%'
+        or lower(interaction_purpose_descrip) like '%no%service%'
+        or lower(interaction_purpose_descrip) like '%hsd%no%'
+        or lower(interaction_purpose_descrip) like '%hsd%slow%'
+        or lower(interaction_purpose_descrip) like '%hsd%intermit%'
+        or lower(interaction_purpose_descrip) like '%no%brows%'
         or lower(interaction_purpose_descrip) like '%phone%cant%'
         or lower(interaction_purpose_descrip) like '%phone%no%'
         or lower(interaction_purpose_descrip) like '%no%connect%'
@@ -172,14 +177,29 @@ SELECT
         or lower(interaction_purpose_descrip) like '%supp%'
         or lower(interaction_purpose_descrip) like '%outage%'
         or lower(interaction_purpose_descrip) like '%mass%'
-        ) then interaction_id else null
+        or lower(interaction_purpose_descrip) like '%discon%warn%'
+        ) and (
+        lower(interaction_purpose_descrip) not like '%work%order%status%'
+        and lower(interaction_purpose_descrip) not like '%default%call%wrapup%'
+        and lower(interaction_purpose_descrip) not like '%bound%call%'
+        and lower(interaction_purpose_descrip) not like '%cust%first%'
+        and lower(interaction_purpose_descrip) not like '%audit%'
+        and lower(interaction_purpose_descrip) not like '%eq%code%'
+        and lower(interaction_purpose_descrip) not like '%downg%'
+        and lower(interaction_purpose_descrip) not like '%upg%'
+        and lower(interaction_purpose_descrip) not like '%vol%discon%'
+        and lower(interaction_purpose_descrip) not like '%discon%serv%'
+        and lower(interaction_purpose_descrip) not like '%serv%call%'
+        )
+        
+        then interaction_id else null
     end as techticket_flag,
     cast(job_no_ojb as varchar) as truckroll_flag
 FROM interactions_fields2 a
 LEFT JOIN truckrolls_clean b
     ON a.interaction_date = cast(create_dte_ojb as date) and cast(a.account_id as varchar) = cast(b.sub_acct_no_sbb as varchar)
-WHERE
-    interaction_purpose_descrip not in ('Work Order Status', 'Default Call Wrapup', 'G:outbound Calls', 'Eq: Cust. First', 'Eq: Audit', 'Eq: Code Error', 'Downgrade Service', 'Disconnect Service', 'Rt: Dowgrde Service', 'Cust Service Calls')
+-- WHERE
+    -- interaction_purpose_descrip not in ('Work Order Status', 'Default Call Wrapup', 'G:outbound Calls', 'Eq: Cust. First', 'Eq: Audit', 'Eq: Code Error', 'Downgrade Service', 'Disconnect Service', 'Rt: Dowgrde Service', 'Cust Service Calls')
     -- and cast(job_no_ojb as varchar) not in ('',  ' ') 
     -- and job_no_ojb is not null
     -- and date_trunc('month', date(create_dte_ojb)) = (SELECT input_month FROM parameters)
