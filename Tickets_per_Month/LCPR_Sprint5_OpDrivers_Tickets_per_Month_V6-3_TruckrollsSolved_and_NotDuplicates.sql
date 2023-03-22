@@ -78,7 +78,7 @@ FROM clean_interaction_time
 
 , interactions_not_repeated as (
 SELECT
-    first_value(interaction_id) OVER(PARTITION BY account_id, interaction_date, interaction_channel, interaction_agent_id ORDER BY interaction_date DESC) AS interaction_id2
+    first_value(interaction_id) OVER(PARTITION BY account_id, interaction_date, interaction_channel, interaction_agent_id, interaction_purpose_descrip ORDER BY interaction_date DESC) AS interaction_id2
 FROM interactions_fields
 )
 
