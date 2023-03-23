@@ -5,7 +5,7 @@
 WITH
 
  parameters as (
- SELECT date_trunc('month', date('2023-01-01')) as input_month --- Input month you wish the code run for
+ SELECT date_trunc('month', date('2022-12-01')) as input_month --- Input month you wish the code run for
  )
 
 
@@ -33,7 +33,7 @@ SELECT
     fix_e_att_active --- f_activebom
     --- mobile_activeeom
     --- mobilechurnflag
-FROM "db_stage_dev"."lcpr_fixed_table_jan_mar17" --- Make sure the right table is being used accordingly to the month requested.
+FROM "db_stage_dev"."lcpr_fixed_table_dec_mar17" --- Make sure the right table is being used accordingly to the month requested.
 WHERE 
     fix_s_dim_month = (SELECT input_month FROM parameters)
     and fix_e_att_active = 1
@@ -212,9 +212,9 @@ SELECT
     count(distinct 
         case 
             when techticket_flag is null and truckroll_flag is null then null
-            when techticket_flag is not null and truckroll_flag is null then interaction_date
-            when techticket_flag is null and truckroll_flag is not null then interaction_date
-            when techticket_flag is not null and truckroll_flag is not null then interaction_date
+            when techticket_flag is not null and truckroll_flag is null then interaction_id
+            when techticket_flag is null and truckroll_flag is not null then interaction_id
+            when techticket_flag is not null and truckroll_flag is not null then interaction_id
         end)
     as number_tickets, 
     count(distinct case when techticket_flag is not null and truckroll_flag is not null then techticket_flag else null end) as number_coincidences
@@ -262,35 +262,35 @@ FROM number_tickets_flag
 WHERE fix_s_fla_churnflag = '2. Fixed NonChurner'
 )
 
-SELECT
-     fix_s_dim_month, -- month
-     fix_b_fla_tech, -- B_Final_TechFlag
-     fix_b_fla_fmc, -- B_FMCSegment
-     fix_b_fla_mixcodeadj, -- B_FMCType
-     fix_e_fla_tech, -- E_Final_TechFlag
-     fix_e_fla_fmc, -- E_FMCSegment
-     fix_e_fla_mixcodeadj, -- E_FMCType
-     -- b_final_tenure
-     -- e_final_tenure
-     fix_b_fla_tenure, -- B_FixedTenure
-     fix_e_fla_tenure, -- E_FixedTenure
-     -- finalchurnflag
-     -- fixedchurnflag
-     -- waterfall_flag
-     count(distinct fix_s_att_account) as Total_Accounts,
-     count(distinct fix_s_att_account) as Fixed_Accounts, 
-     sum(number_tickets) as number_tickets
-FROM final_fields
-GROUP BY 1, 2, 3, 4, 5, 6, 7, 8, 9
+-- SELECT
+--      fix_s_dim_month, -- month
+--      fix_b_fla_tech, -- B_Final_TechFlag
+--      fix_b_fla_fmc, -- B_FMCSegment
+--      fix_b_fla_mixcodeadj, -- B_FMCType
+--      fix_e_fla_tech, -- E_Final_TechFlag
+--      fix_e_fla_fmc, -- E_FMCSegment
+--      fix_e_fla_mixcodeadj, -- E_FMCType
+--      -- b_final_tenure
+--      -- e_final_tenure
+--      fix_b_fla_tenure, -- B_FixedTenure
+--      fix_e_fla_tenure, -- E_FixedTenure
+--      -- finalchurnflag
+--      -- fixedchurnflag
+--      -- waterfall_flag
+--      count(distinct fix_s_att_account) as Total_Accounts,
+--      count(distinct fix_s_att_account) as Fixed_Accounts, 
+--      sum(number_tickets) as number_tickets
+-- FROM final_fields
+-- GROUP BY 1, 2, 3, 4, 5, 6, 7, 8, 9
 
 -- ### ### ### ### Specific numbers
 
 --- ### KPI calculation
--- SELECT
---     sum(number_tickets) as number_tickets,
---     count(distinct fix_s_att_account) as active_base, 
---     round(cast(sum(number_tickets) as double)/(cast(count(distinct fix_s_att_account) as double)/100), 2) as tickets_per_100_users
--- FROM final_fields
+SELECT
+    sum(number_tickets) as number_tickets,
+    count(distinct fix_s_att_account) as active_base, 
+    round(cast(sum(number_tickets) as double)/(cast(count(distinct fix_s_att_account) as double)/100), 2) as tickets_per_100_users
+FROM final_fields
 
 --- ### Interactions categories
 -- SELECT
