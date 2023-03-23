@@ -3,7 +3,7 @@
 WITH
   
  parameters as (
- SELECT date_trunc('month', date('2023-01-01')) as input_month --- Input month you wish the code run for
+ SELECT date_trunc('month', date('2023-02-01')) as input_month --- Input month you wish the code run for
  )
  
 , fmc_table as ( --- This actually is the Fixed Table, it is called fmc just to get ready for when that table is ready
@@ -29,7 +29,7 @@ SELECT
     fix_e_att_active --- f_activebom
     --- mobile_activeeom
     --- mobilechurnflag
-FROM "db_stage_dev"."lcpr_fixed_table_jan_mar17" --- Keep this updated to the latest version!
+FROM "db_stage_dev"."lcpr_fixed_table_feb_mar17" --- Keep this updated to the latest version!
 WHERE 
     fix_s_dim_month = (SELECT input_month FROM parameters)
     and fix_e_att_active = 1
@@ -259,9 +259,8 @@ SELECT
         when techticket_flag is not null and truckroll_flag is null then interaction_id
         when techticket_flag is null and truckroll_flag is not null then interaction_id
         when techticket_flag is not null and truckroll_flag is not null then interaction_id
-    end)
-    as number_tickets,
-FROM users_tickets_pre1
+    end as number_tickets
+FROM users_tickets_pre
 )
 
 , last_ticket as (
@@ -278,7 +277,8 @@ SELECT
     interaction_date, 
     date_trunc('month', last_interaction_date) as interaction_month, 
     last_interaction_date, 
-    date_add('day', -60, last_interaction_date) as window_day
+    date_add('day', -60, last_interaction_date) as window_day, 
+    number_tickets
 FROM users_tickets W
 INNER JOIN last_ticket L
     ON W.account_id = L.last_account
