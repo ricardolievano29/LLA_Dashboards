@@ -50,7 +50,7 @@ FROM clean_interaction_time
 
 , interactions_not_repeated as (
 SELECT
-    first_value(interaction_id) OVER(PARTITION BY account_id, interaction_date, interaction_channel, interaction_agent_id, interaction_purpose_descrip ORDER BY interaction_date DESC) AS interaction_id2
+    first_value(interaction_id) over(partition by account_id, interaction_date, interaction_channel, interaction_agent_id, interaction_purpose_descrip order by interaction_date desc) as interaction_id2
 FROM interactions_fields
 )
 
@@ -184,11 +184,12 @@ FROM vol_user_panel
 GROUP BY 1
 )
 
--- , invol_churners as (
--- SELECT
---     *
--- FROM AAAA
--- )
+, invol_churners as (
+SELECT
+    *
+FROM "db_stage_dev"."lcpr_fmc_table_jan_mar23"
+WHERE fmc_s_fla_churntype = 'Involuntary Churner'
+)
 
 --- ### Joining tables together
 
@@ -265,20 +266,20 @@ SELECT
 FROM interactions_panel
 WHERE
     tech_ticket_flg = 1 or truckroll_flg = 1
-ORDER BY tech_ticket_flg desc --- last_interaction_disposition_info desc
+ORDER BY tech_ticket_flg desc --- , last_interaction_disposition_info desc
 )
 
 , final_pre1 as (
 SELECT
     bridger_addr_hse, 
     count(distinct n.sub_acct_no_sbb) as total_accounts, 
-    count(distinct account_id_vol_dx) as vol_churners
-    -- count(distinct i.sub_acct_no_sbb) as invol_churners
+    count(distinct account_id_vol_dx) as vol_churners,
+    count(distinct i.fmc_s_att_account) as invol_churners
 FROM customers_dna n
 LEFT JOIN vol_churners v
     ON cast(n.sub_acct_no_sbb as varchar) = cast(v.account_id_vol_dx as varchar)
--- LEFT JOIN invol_churners i
-    -- ON cast(a.sub_acct_no_sbb as varchar) = cast(i.sub_acct_no_sbb as varchar)
+LEFT JOIN invol_churners i
+    ON cast(n.sub_acct_no_sbb as varchar) = cast(i.fmc_s_att_account as varchar)
 GROUP BY 1
 )
 
@@ -325,7 +326,8 @@ WHERE a.total_accounts > 30
 --- ### KPI Calculation
 
 SELECT 
-    sum(case when act_with_ticket_rate >= 0.06 then 1 else 0 end)
+    -- sum(case when act_with_ticket_rate >= 0.06 then 1 else 0 end)
+    sum(case when act_with_ticket_rate >= 0.1 then 1 else 0 end)
 FROM final
 
 -- SELECT
