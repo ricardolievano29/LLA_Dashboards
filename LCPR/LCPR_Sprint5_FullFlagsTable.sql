@@ -1,132 +1,114 @@
---- ##### LCPR SPRINT 5  OPERATIONAL DRIVERS - FULL FLAGS TABLE #####
-
---- ### ### ### Initial steps (Common in most of the calculations)
-
-WITH
-
---- --- --- Month you wish the code run for
-parameters as (SELECT date_trunc('month', date ('2023-02-01')) as input_month)
-
---- --- --- FMC table
-, fmc_table as (
-SELECT
-    *
-FROM "db_stage_dev"."lcpr_fmc_table_feb_mar17" --- Make sure to set the month accordindly to the input month of parameters
-WHERE 
-    fmc_s_dim_month = (SELECT input_month FROM parameters)
+WITH FMC_Table AS
+( SELECT * FROM "lla_cco_int_ana_prod"."cwc_fmc_churn_prod" 
 )
 
-, repeated_accounts as (
-SELECT 
-    fmc_s_dim_month, 
-    fix_s_att_account, --- Operational Drivers are focused just in Fixed dynamics, not Mobile. I don't take the FMC account because sometimes in concatenates Fixed and Mobile accounts ids, which alters the results when joining with other bases using the account id.
-    count(*) as records_per_user
-FROM fmc_table
-WHERE 
-    fix_s_att_account is not null --- Making sure that we are focusing just in Fixed.
-    and fix_e_att_active = 1 --- The denominator of most of the Sprint 5 is the active base.
-GROUP BY 1, 2
-ORDER BY 3 desc
+------------ reiterative tickets ---------------------------------------
+
+,initial_table as 
+(
+SELECT date_trunc('Month', date(interaction_start_time)) as Ticket_Month, account_id_2 as account, 
+last_value(interaction_start_time) over (partition by account_id_2, date_trunc('Month', date(interaction_start_time)) order by interaction_start_time) as last_int_dt, *
+FROM (select *, REGEXP_REPLACE(account_id,'[^0-9 ]','') as account_id_2
+from "db-stage-dev"."interactions_cwc"
+where lower(org_cntry) like '%jam%'
+))
+
+, tickets_count as (
+
+SELECT Ticket_Month, account, 
+case when (length(account) = 8) THEN 'Cerillion' else 'Liberate' end as CRM
+,count(distinct interaction_id) as tickets
+FROM initial_table
+WHERE interaction_start_time between (last_int_dt - interval '60' day) and last_int_dt
+GROUP BY 1,2
 )
 
-, fmc_table_adj as (
-SELECT 
-    F.*,
-    records_per_user
-FROM fmc_table F
-LEFT JOIN repeated_accounts R
-    ON F.fix_s_att_account = R.fix_s_att_account and F.fmc_s_dim_month = R.fmc_s_dim_month
-)
--- SELECT * FROM fmc_table_adj LIMIT 100
---- --- --- Interactions
-, clean_interaction_time as (
-SELECT *
-FROM "lcpr.stage.prod"."lcpr_interactions_csg"
-WHERE
-    (cast(interaction_start_time as varchar) != ' ') 
-    and (interaction_start_time is not null)
-    and date_trunc('month', cast(substr(cast(interaction_start_time as varchar),1,10) as date)) between ((SELECT input_month FROM parameters)) and ((SELECT input_month FROM parameters) + interval '1' month - interval '1' day)
-    and account_type = 'RES'
+,reiterations_summary AS(
+
+SELECT t.*, 
+CASE WHEN tickets = 1 THEN account else null end as one_tckt,
+CASE WHEN tickets > 1 THEN account else null end as over1_tckt,
+CASE WHEN tickets = 2 THEN account else null end as two_tckt,
+CASE WHEN tickets >= 3 THEN account else null end as three_tckt
+FROM tickets_count t
+
 )
 
-, interactions_fields as (
-SELECT
-    *,
-    cast(substr(cast(interaction_start_time as varchar), 1, 10) as date) as interaction_date, 
-    date_trunc('month', cast(substr(cast(interaction_start_time as varchar), 1, 10) as date)) as month
-FROM clean_interaction_time
+,reiterationtickets_flag AS(
+
+SELECT f.*, Ticket_Month as RTicket_Month, one_tckt, over1_tckt, two_tckt, three_tckt
+FROM FMC_Table f left join reiterations_summary r on f.fixed_account = r.account
+and f.Month = r.Ticket_Month
+
 )
 
-, interactions_not_repeated as (
-SELECT
-    first_value(interaction_id) OVER(PARTITION BY account_id, interaction_date, interaction_channel, interaction_agent_id, interaction_purpose_descrip ORDER BY interaction_date DESC) AS interaction_id2
-FROM interactions_fields
+----------- Outlier repair times - interactions approach -----------------------
+
+,repair_times AS(
+
+SELECT date_trunc('Month', date(interaction_start_time)) as Repair_Month, account_id_2 as account, interaction_start_time, interaction_end_time,
+date_diff('day', interaction_start_time, interaction_end_time) as solving_time
+FROM (select *, REGEXP_REPLACE(account_id,'[^0-9 ]','') as account_id_2
+from "db-stage-dev"."interactions_cwc"
+where lower(org_cntry) like '%jam%' and interaction_status = 'CLOSED'
+AND Length (account_id) in (8,12))
 )
 
-, interactions_fields2 as (
-SELECT *
-FROM interactions_not_repeated a
-LEFT JOIN interactions_fields b
-    ON a.interaction_id2 = b.interaction_id
+, outlier_times AS(
+
+SELECT Repair_month, account, interaction_start_time, interaction_end_time, solving_time,
+CASE WHEN max(solving_time) > 4 THEN account else null end as outlier_repair
+FROM repair_times r
+GROUP BY 1,2,3,4,5
+ORDER BY 1 desc, 5 desc, account
 )
 
---- --- --- External file: Truckrolls
-, truckrolls as (
-SELECT 
-    create_dte_ojb, 
-    job_no_ojb, 
-    sub_acct_no_sbb
-FROM "lcpr.stage.dev"."truckrolls"
+, outlier_repair_flag AS
+(
+SELECT f.*, case when length (f.fixed_account) = 8 then 'Cerillion'
+else 'Liberate' END AS CRM, repair_month,
+CASE when account is not null then account else null end as techticket,
+outlier_repair
+FROM reiterationtickets_flag f 
+left join outlier_times o on f.fixed_account = o.account and f.month = o.repair_month
+
 )
 
+----------------- Tech tickets density ---------------------------------------
 
---- ### ### ### Repeated callers
-
-, interactions_count as (
-SELECT
-    date_trunc('month', interaction_date) as interaction_month, 
-    account_id, 
-    count(distinct interaction_id) as interactions
-FROM interactions_fields2
-WHERE
-    interaction_date between date_add('day', -60, interaction_date) and interaction_date --- This is the Moving Window
-GROUP BY 1, 2
+, tickets_per_account AS(
+SELECT date_trunc('Month', date(interaction_start_time)) as Ticket_Month, account, count(distinct interaction_id) as numtickets
+FROM (select *, REGEXP_REPLACE(account_id,'[^0-9 ]','') as account
+from "db-stage-dev"."interactions_cwc"
+where lower(org_cntry) like '%jam%' 
 )
-
-, interactions_tier as (
-SELECT
-    *, 
-    case 
-        when interactions = 1 then '1'
-        when interactions = 2 then '2'
-        when interactions >= 3 then '>3'
-        else null
-    end as interaction_tier
-FROM interactions_count
+GROUP BY 1,2
 )
 
 
---- ### ### ### Joining all flags
-
-, flag1_repeated_callers as(
-SELECT 
-    F.*, 
-    case when I.account_id is not null then F.fix_s_att_account else null end as interactions, 
-    interaction_tier
-FROM fmc_table_adj F
-LEFT JOIN interactions_tier I
-    ON cast(F.fix_s_att_account as varchar) = cast(I.account_id as varchar) and F.fmc_s_dim_month = I.interaction_month
-WHERE
-    fix_e_att_active = 1 
+,records_fixed_accounts as (
+select distinct Month, fixed_account, count(*) as numrecords
+FROM outlier_repair_flag
+WHERE month = date(dt)
+Group by 1,2
 )
 
---- --- ---
-SELECT * FROM flag1_repeated_callers LIMIT 100
+,ticket_density_flag AS(
 
---- ### Specific numbers
+SELECT f.*, numtickets, numrecords, (numtickets/numrecords) as adj_tickets
+FROM outlier_repair_flag f  INNER JOIN records_fixed_accounts r 
+ON f.fixed_account = r.fixed_account and f.Month = r.Month 
+LEFT JOIN tickets_per_account t
+ON f.fixed_account = t.account AND f.month = t.Ticket_Month
+)
 
--- SELECT
---     interaction_tier,
---     count(distinct fix_s_att_account) as num_cliets
--- FROM flag1_repeated_callers
--- GROUP BY 1
+,results_table_S5 as (SELECT Month,E_Final_Tech_Flag, E_FMC_Segment, E_FMCType, E_FinalTenureSegment, count(distinct fixed_account) as activebase, count(distinct one_tckt) as one_ticket,  count(distinct over1_tckt) over1_ticket, count(distinct two_tckt) as two_tickets, count(distinct three_tckt) as three_more_tickets,
+count (distinct techticket) as ticket_customers,
+sum(adj_tickets) as totaltickets ,count(distinct outlier_repair) as outlier_repairs 
+FROM ticket_density_flag
+where finalchurnflag <> 'Fixed Churner' and waterfall_flag <> 'Downsell-Fixed Customer Gap' and waterfall_flag <> 'Fixed Base Exceptions' and mainmovement <> '6.Null last day' and waterfall_flag <> 'Churn Exception'
+and month = date(dt)
+group by 1,2,3,4,5
+order by 1,2,3,4,5)
+
+select * from results_table_S5
