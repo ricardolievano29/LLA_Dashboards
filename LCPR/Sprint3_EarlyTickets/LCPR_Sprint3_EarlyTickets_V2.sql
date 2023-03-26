@@ -156,9 +156,9 @@ LEFT JOIN relevant_interactions B
 )
 
 SELECT 
-    date_add('month', 0,install_month), 
+    date_add('month', 0,install_month) as odr_s_dim_month, 
     count(distinct early_interaction_flag) as opd_s_mes_uni_early_tickets, 
-    count(distinct fix_s_att_account) as fixed_Account 
+    count(distinct fix_s_att_account) as fmc_s_att_account
 FROM new_customer_interactions_info 
 GROUP BY 1 
 ORDER BY 1
