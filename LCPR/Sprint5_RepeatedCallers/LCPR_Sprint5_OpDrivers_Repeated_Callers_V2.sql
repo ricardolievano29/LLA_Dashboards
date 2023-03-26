@@ -33,7 +33,7 @@ SELECT
     fix_e_att_active --- f_activebom
     --- mobile_activeeom
     --- mobilechurnflag
-FROM "db_stage_dev"."lcpr_fixed_table_jan_mar06" --- Keep this updated to the lastest version!
+FROM "db_stage_dev"."lcpr_fixed_table_jan_mar17" --- Keep this updated to the lastest version!
 WHERE 
     fix_s_dim_month = (SELECT input_month FROM parameters)
 )
@@ -134,28 +134,28 @@ LEFT JOIN interactions_tier I
 
 , final_fields as (
 SELECT
-    distinct fix_s_dim_month, -- month
-    fix_b_fla_tech, -- B_Final_TechFlag
-    fix_b_fla_fmc, -- B_FMCSegment
-    fix_b_fla_mixcodeadj, -- B_FMCType
-    fix_e_fla_tech, -- E_Final_TechFlag
-    fix_e_fla_fmc, -- E_FMCSegment
-    fix_e_fla_mixcodeadj, -- E_FMCType
+    distinct fix_s_dim_month as opd_s_dim_month, -- month
+    fix_b_fla_tech as fmc_b_fla_tech_type, -- B_Final_TechFlag
+    fix_b_fla_fmc as fmc_b_fla_fmc_status, -- B_FMCSegment
+    fix_b_fla_mixcodeadj as fmc_b_dim_mix_code_adj, -- B_FMCType
+    fix_e_fla_tech as fmc_e_fla_tech_type, -- E_Final_TechFlag
+    fix_e_fla_fmc as fmc_e_fla_fmc_status, -- E_FMCSegment
+    fix_e_fla_mixcodeadj as fmc_e_dim_mix_code_adj, -- E_FMCType
     -- b_final_tenure
     -- e_final_tenure
-    fix_b_fla_tenure, -- B_FixedTenure
-    fix_e_fla_tenure, -- E_FixedTenure
+    fix_b_fla_tenure as fmc_b_fla_final_tenure, -- B_FixedTenure
+    fix_e_fla_tenure as fmc_e_fla_final_tenure, -- E_FixedTenure
     -- finalchurnflag
     -- fixedchurnflag
-    fix_s_fla_churntype, -- fixedchurntype
-    fix_s_fla_mainmovement, -- fixedmainmovement
+    fix_s_fla_churntype as fmc_s_fla_churn_type, -- fixedchurntype
+    fix_s_fla_mainmovement as fmc_s_fla_main_movement, -- fixedmainmovement
     -- waterfall_flag
     -- mobile_activeeom
     -- mobilechurnflag
-    interaction_tier,
+    interaction_tier as odr_s_fla_interaction_tier,
     -- finalaccount
-    fix_s_att_account, -- fixedaccount
-    interactions,
+    fix_s_att_account as fmc_s_att_final_account, -- fixedaccount
+    interactions as odr_s_mes_user_interactions,
     records_per_user
 FROM interaction_tier_flag
 WHERE fix_s_fla_churnflag = '2. Fixed NonChurner'
@@ -163,30 +163,30 @@ WHERE fix_s_fla_churnflag = '2. Fixed NonChurner'
 )
 
 SELECT
-    fix_s_dim_month, -- month
-    fix_b_fla_tech, -- B_Final_TechFlag
-    fix_b_fla_fmc, -- B_FMCSegment
-    fix_b_fla_mixcodeadj, -- B_FMCType
-    fix_e_fla_tech, -- E_Final_TechFlag
-    fix_e_fla_fmc, -- E_FMCSegment
-    fix_e_fla_mixcodeadj, -- E_FMCType
+    opd_s_dim_month, -- fix_s_dim_month, -- month
+    fmc_b_fla_tech_type, -- fix_b_fla_tech, -- B_Final_TechFlag
+    fmc_b_fla_fmc_status, -- fix_b_fla_fmc, -- B_FMCSegment
+    fmc_b_dim_mix_code_adj -- fix_b_fla_mixcodeadj, -- B_FMCType
+    fmc_e_fla_tech_type, -- fix_e_fla_tech, -- E_Final_TechFlag
+    fmc_e_fla_fmc_status, -- fix_e_fla_fmc, -- E_FMCSegment
+    fmc_e_dim_mix_code_adj, -- fix_e_fla_mixcodeadj, -- E_FMCType
     -- b_final_tenure
     -- e_final_tenure
-    fix_b_fla_tenure, -- B_FixedTenure
-    fix_e_fla_tenure, -- E_FixedTenure
+    fmc_b_fla_final_tenure, -- fix_b_fla_tenure, -- B_FixedTenure
+    fmc_e_fla_final_tenure, -- fix_e_fla_tenure, -- E_FixedTenure
     -- finalchurnflag
     -- fixedchurnflag
     -- waterfall_flag
-    interaction_tier,
-    count(distinct fix_s_att_account) as Total_Accounts,
-    count(distinct fix_s_att_account) as Fixed_Accounts
+    odr_s_fla_interaction_tier, -- interaction_tier,
+    count(distinct fmc_s_att_final_account) as odr_s_mes_total_accounts
+    -- count(distinct fmc_s_att_final_account) as Fixed_Accounts
 FROM final_fields
-GROUP BY 1, 2, 3, 4, 5, 6, 7, 8, 9, 10
+GROUP BY 1, 2, 3, 4, 5, 6, 7, 8, 9
 
 --- ### Specific numbers
 
 -- SELECT
---     count(distinct fix_s_att_account) as num_cliets
+--     count(distinct fmc_s_att_final_account) as num_cliets
 -- FROM final_fields
 -- WHERE
 --     interaction_tier = '1'
