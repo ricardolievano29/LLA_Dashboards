@@ -318,30 +318,34 @@ WHERE
   and fix_e_att_active = 1
 )
 
--- SELECT
---     fix_s_dim_month, -- month
---     fix_b_fla_tech, -- B_Final_TechFlag
---     fix_b_fla_fmc, -- B_FMCSegment
---     fix_b_fla_mixcodeadj, -- B_FMCType
---     fix_e_fla_tech, -- E_Final_TechFlag
---     fix_e_fla_fmc, -- E_FMCSegment
---     fix_e_fla_mixcodeadj, -- E_FMCType
---     -- b_final_tenure
---     -- e_final_tenure
---     fix_b_fla_tenure, -- B_FixedTenure
---     fix_e_fla_tenure, -- E_FixedTenure
---     -- finalchurnflag
---     -- fixedchurnflag
---     fix_s_fla_churntype, -- fixedchurntype
---     fix_s_fla_mainmovement, -- fixedmainmovement
---     -- waterfall_flag
---     -- mobile_activeeom
---     -- mobilechurnflag
---     ticket_tier,
---     count(distinct fix_s_att_account) as Total_Accounts,
---     count(distinct fix_s_att_account) as Fixed_Accounts
--- FROM final_fields
--- GROUP BY 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12
+SELECT
+    fix_s_dim_month as opd_s_dim_month, -- month
+    fix_b_fla_tech as fmc_b_fla_tech_type, -- B_Final_TechFlag
+    fix_b_fla_fmc as fmc_b_fla_fmc_status, -- B_FMCSegment
+    fix_b_fla_mixcodeadj as fmc_b_dim_mix_code_adj, -- B_FMCType
+    fix_e_fla_tech as fmc_e_fla_tech_type, -- E_Final_TechFlag
+    fix_e_fla_fmc as fmc_e_fla_fmc_status, -- E_FMCSegment
+    fix_e_fla_mixcodeadj as fmc_e_dim_mix_code_adj, -- E_FMCType
+    -- b_final_tenure
+    -- e_final_tenure
+    fix_b_fla_tenure as fmc_b_fla_final_tenure, -- B_FixedTenure
+    fix_e_fla_tenure as fmc_e_fla_final_tenure, -- E_FixedTenure
+    -- b_final_tenure
+    -- e_final_tenure
+    -- fix_b_fla_tenure, -- B_FixedTenure
+    -- fix_e_fla_tenure, -- E_FixedTenure
+    -- finalchurnflag
+    -- fixedchurnflag
+    fix_s_fla_churntype as fmc_s_fla_churn_type, -- fixedchurntype
+    fix_s_fla_mainmovement as fmc_s_fla_main_movement, -- fixedmainmovement
+    -- waterfall_flag
+    -- mobile_activeeom
+    -- mobilechurnflag
+    ticket_tier as odr_s_fla_tickets_tier,
+    count(distinct fix_s_att_account) as odr_s_mes_total_accounts
+    -- count(distinct fix_s_att_account) as Fixed_Accounts
+FROM final_fields
+GROUP BY 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12
 
 --- ### Specific numbers
 
@@ -350,8 +354,8 @@ WHERE
 -- FROM final_fields
 -- WHERE ticket_tier = '1'
 
-SELECT 
-    distinct ticket_tier,
-    count(distinct fix_s_att_account) as num_clients
-FROM final_fields
-GROUP BY 1
+-- SELECT 
+--     distinct ticket_tier,
+--     count(distinct fix_s_att_account) as num_clients
+-- FROM final_fields
+-- GROUP BY 1
