@@ -1,4 +1,4 @@
---- ##### LCPR SPRINT 5  OPERATIONAL DRIVERS - FULL FLAGS TABLE #####
+--- ##### LCPR SPRINT 3  OPERATIONAL DRIVERS - FULL FLAGS TABLE #####
 
 --- ### ### ### Initial steps (Common in most of the calculations)
 
@@ -6,14 +6,14 @@ WITH
 
 --- --- --- Month you wish the code run for
 parameters as (
-SELECT date_trunc('month', date('2023-01-01')) AS input_month
+SELECT date_trunc('month', date('2023-02-01')) AS input_month
 )
 
 --- --- --- FMC table
 , fmc_table as (
 SELECT
     *
-FROM "db_stage_dev"."lcpr_fmc_table_jan_mar23" --- Make sure to set the month accordindly to the input month of parameters
+FROM "db_stage_dev"."lcpr_fmc_table_feb_mar23" --- Make sure to set the month accordindly to the input month of parameters
 WHERE 
     fmc_s_dim_month = (SELECT input_month FROM parameters)
 )
@@ -208,7 +208,28 @@ LEFT JOIN relevant_interactions B
 
 --- ### ### ### Outlier Install Times
 
+, installations as (
+SELECT
+    *
+FROM "lcpr.stage.prod"."so_ln_lcpr"
+WHERE
+    org_id = 'LCPR' and org_cntry = 'PR'
+    and order_status = 'COMPLETE'
+    and command_id = 'CONNECT'
+)
 
+, outlier_installs as (
+SELECT
+    account_id, 
+    fix_b_att_maxstart, 
+    date_trunc('month', date(dt)) as month, -- Why dt instead of fix_b_att_maxstart or other dates?
+    cast(cast(order_start_date as timestamp) as date) as order_start_date, 
+    cast(cast(completed_date as timestamp) as date) as completed_date, 
+    case when date_diff('day', cast(cast(order_start_date as timestamp) as date), cast(cast(completed_date as timestamp) as date)) > 6 then account_id else null end as outlier_install_flag
+FROM installations a
+INNER JOIN new_customers b
+    ON cast(a.account_id as varchar) = cast(b.fix_s_att_account as varchar)
+)
 
 --- ### ### ### MRC Changes
 
@@ -236,13 +257,21 @@ WHERE
     fix_e_att_active = 1 
 )
 
+, flag4_outlier_installs as (
+SELECT 
+    F.*, 
+    outlier_install_flag
+FROM flag3_early_tickets F
+LEFT JOIN outlier_installs I
+    ON cast(F.fix_s_att_account as varchar) = cast(I.account_id as varchar) and F.fmc_s_dim_month = I.month
+)
 
 --- ### ### ### Final table
 
 --- --- --- Jamaica's structure
 , sprint3_full_table_LikeJam as (
 SELECT 
-    fmc_s_dim_month as odr_s_dim_month,
+    fmc_s_dim_month as opd_s_dim_month,
     fmc_e_fla_tech as odr_e_fla_final_tech, -- E_Final_Tech_Flag, 
     fmc_e_fla_fmcsegment as odr_e_fla_fmc_segment, -- E_FMC_Segment, 
     fmc_e_fla_fmc as odr_e_fla_fmc_type, -- E_FMCType, 
@@ -252,7 +281,7 @@ SELECT
     -- sum(monthsale_flag) as Sales, 
     -- sum(SoftDx_Flag) as Soft_Dx, 
     -- sum (NeverPaid_Flag) as NeverPaid,
-    -- sum(long_install_flag) as Long_installs, 
+    count(distinct outlier_install_flag) as opd_s_mes_long_installs, 
     -- sum (increase_flag) as MRC_Increases, 
     -- sum (no_plan_change_flag) as NoPlan_Changes, 
     -- sum(mountingbill_flag) as MountingBills, 
@@ -268,7 +297,7 @@ SELECT
     -- count(distinct F_NoPlanChangeFlag) Unique_NoPlanChanges,
     -- count(distinct F_MountingBillFlag) Unique_Mountingbills, 
     count(distinct early_ticket_flag) as opd_s_mes_uni_early_tickets
-FROM flag3_early_tickets
+FROM flag4_outlier_installs
 WHERE 
     fmc_s_fla_churnflag != 'Fixed Churner' 
     and fmc_s_fla_waterfall not in ('Downsell-Fixed Customer Gap', 'Fixed Base Exception', 'Churn Exception') 
@@ -305,7 +334,14 @@ SELECT * FROM sprint3_full_table_LikeJam
 
 --- Outlier Install Times
 
-
+-- SELECT
+--     opd_s_dim_month, 
+--     sum(opd_s_mes_long_installs) as outlier_installs, 
+--     sum(opd_s_mes_sales) as new_customers_base, 
+--     (cast(sum(opd_s_mes_long_installs) as double)/cast(sum(opd_s_mes_sales) as double)) as outlier_installs_kpi
+-- FROM sprint3_full_table_LikeJam 
+-- GROUP BY 1
+-- ORDER BY 1
 
 --- MRC Changes
 
