@@ -6,7 +6,7 @@ WITH
 
 --- --- --- Month you wish the code run for
 parameters as (
-SELECT date_trunc('month', date('2023-01-01')) AS input_month
+SELECT date_trunc('month', date('2023-02-01')) AS input_month
 )
 
 --- --- --- FMC table
@@ -375,17 +375,17 @@ WHERE
 
 --- ### ### ### Mounting Bills
 
-, usefulfields_dna as (
+, usefulfields as (
 SELECT  
     date_trunc('month', date(dt)) as fmc_s_dim_month,
     delinquency_days, 
     sub_acct_no_sbb as fix_s_att_account, 
-    sum(case when delinquency_days = 60 then 1 else 0 end) as mounting_bill_flag
+    sum(case when delinquency_days = 60 then sub_acct_no_sbb else 0 end) as mounting_bill_flag
 FROM "lcpr.stage.prod"."insights_customer_services_rates_lcpr" 
 WHERE 
     play_type <> '0P'
     and cust_typ_sbb = 'RES' 
-    and date(dt) between (SELECT input_month FROM parameters) and (SELECT input_month FROM parameters) + interval '1' month - interval '1' day
+    and date_trunc('month', date(dt)) = (SELECT input_month FROM parameters)
 GROUP BY 1, 2, 3
 )
 
@@ -393,13 +393,13 @@ GROUP BY 1, 2, 3
  SELECT 
     a.fmc_s_dim_month,
     a.fix_s_att_account,
-    sum(mounting_bill_flag) as mounting_bill_flag
+    mounting_bill_flag
 FROM fmc_table_adj a 
-LEFT JOIN usefulfields_dna b 
+LEFT JOIN usefulfields b 
     ON a.fmc_s_dim_month = b.fmc_s_dim_month and a.fix_s_att_account = b.fix_s_att_account 
-WHERE 
-    a.fmc_s_dim_month = (SELECT input_month FROM parameters)
-GROUP BY 1, 2
+-- WHERE 
+--     fix_e_att_active = 1
+-- GROUP BY 1, 2
  )
 
 --- ### ### ### Joining all flags
@@ -474,6 +474,8 @@ LEFT JOIN mounting_bills I
     ON cast(F.fix_s_att_account as varchar) = cast(I.fix_s_att_account as varchar) and F.fmc_s_dim_month = I.fmc_s_dim_month
 )
 
+-- SELECT * FROM flag7_mounting_bills LIMIT 100
+
 --- ### ### ### Final table
 
 --- --- --- Jamaica's structure
@@ -507,7 +509,7 @@ SELECT
     -- count(distinct F_LongInstallFlag) Unique_LongInstall,
     count(distinct mrc_increase_flag) as opd_s_mes_uni_mrcincrease,
     count(distinct no_plan_change) as opd_s_mes_uni_noplan_changes,
-    sum(mounting_bill_flag) as opd_s_mes_uni_moun_gbills, 
+    count(distinct mounting_bill_flag) as opd_s_mes_uni_moun_gbills, 
     count(distinct early_ticket_flag) as opd_s_mes_uni_early_tickets, 
     count(distinct billing_claim_flag) as opd_s_mes_uni_bill_claim
 FROM flag7_mounting_bills
@@ -651,10 +653,9 @@ SELECT * FROM sprint3_full_table_LikeJam
     
 --- Mounting Bills
 -- SELECT 
---     opd_s_dim_month,
---     sum(opd_s_mes_uni_moun_gbills) as mounting_bills, 
---     sum(odr_s_mes_active_base) as active_base, 
---     cast(sum(opd_s_mes_uni_moun_gbills) as double)/cast(sum(odr_s_mes_active_base) as double) as mounting_bills_kpi
--- FROM sprint3_full_table_LikeJam  
--- GROUP BY 1 
--- ORDER BY 1
+--     opd_s_dim_month, 
+--     sum(opd_s_mes_uni_moun_gbills), 
+--     sum(odr_s_mes_active_base), 
+--     cast(sum(opd_s_mes_uni_moun_gbills) as double)/cast(sum(odr_s_mes_active_base) as double)
+-- FROM sprint3_full_table_LikeJam
+-- GROUP BY 1
