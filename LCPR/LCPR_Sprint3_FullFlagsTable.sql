@@ -6,7 +6,7 @@ WITH
 
 --- --- --- Month you wish the code run for
 parameters as (
-SELECT date_trunc('month', date('2023-02-01')) AS input_month
+SELECT date_trunc('month', date('2023-01-01')) AS input_month
 )
 
 --- --- --- FMC table
@@ -563,7 +563,7 @@ ORDER BY 1
 )
 
 --- --- ---
-SELECT * FROM sprint3_full_table_LikePan
+SELECT * FROM sprint3_full_table_LikeJam
 
 --- ### ### ### Specific numbers
 
@@ -607,7 +607,7 @@ SELECT * FROM sprint3_full_table_LikePan
 -- FROM sprint3_full_table_LikeJam 
 -- GROUP BY 1
 -- ORDER BY 1
-
+    
 --- MRC Changes
 -- SELECT 
 --     opd_s_dim_month, 
