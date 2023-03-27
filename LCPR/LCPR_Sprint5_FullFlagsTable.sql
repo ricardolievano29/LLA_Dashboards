@@ -399,18 +399,26 @@ ORDER BY 1, 2, 3, 4, 5, 6
 --     fmc_e_fla_tech as odr_e_fla_final_tech, -- E_Final_TechFlag, 
 --     fmc_e_fla_fmcsegment as odr_e_fla_fmc_segment, -- E_FMCSegment, 
 --     fmc_e_fla_fmc as odr_e_fla_fmc_type, -- E_FMCType, 
---     case 
-        -- when fmc_b_fla_tenure = 'Early Tenure' then 'Early-Tenure'
-        -- when fmc_b_fla_tenure = 'Mid Tenure' then 'Mid-Tenure'
-        -- when fmc_b_fla_tenure = 'Late Tenure' then 'Late-Tenure'
+    -- case 
+    --     when fmc_b_fla_tenure = 'Early Tenure' then 'Early-Tenure'
+    --     when fmc_b_fla_tenure = 'Mid Tenure' then 'Mid-Tenure'
+    --     when fmc_b_fla_tenure = 'Late Tenure' then 'Late-Tenure'
     -- end as odr_b_fla_final_tenure, , -- b_final_tenure, 
---     case 
-        -- when fmc_e_fla_tenure = 'Early Tenure' then 'Early-Tenure'
-        -- when fmc_e_fla_tenure = 'Mid Tenure' then 'Mid-Tenure'
-        -- when fmc_e_fla_tenure = 'Late Tenure' then 'Late-Tenure'
+    -- case 
+    --     when fmc_e_fla_tenure = 'Early Tenure' then 'Early-Tenure'
+    --     when fmc_e_fla_tenure = 'Mid Tenure' then 'Mid-Tenure'
+    --     when fmc_e_fla_tenure = 'Late Tenure' then 'Late-Tenure'
     -- end as odr_e_fla_final_tenure, -- e_final_tenure, 
---     fix_b_fla_tenure as odr_b_fla_tenure, -- B_FixedTenure, 
---     fix_e_fla_tenure as odr_e_fla_tenure, -- E_FixedTenure, 
+    -- case 
+    --     when fix_b_fla_tenure = 'Early Tenure' then 'Early-Tenure'
+    --     when fix_b_fla_tenure = 'Mid Tenure' then 'Mid-Tenure'
+    --     when fix_b_fla_tenure = 'Late Tenure' then 'Late-Tenure'
+    -- end as odr_b_fla_tenure, -- B_FixedTenure, 
+    -- case 
+    --     when fix_e_fla_tenure = 'Early Tenure' then 'Early-Tenure'
+    --     when fix_e_fla_tenure = 'Mid Tenure' then 'Mid-Tenure'
+    --     when fix_e_fla_tenure = 'Late Tenure' then 'Late-Tenure'
+    -- end as odr_e_fla_tenure, -- E_FixedTenure, 
 --     interaction_tier as odr_s_fla_interaction_tier, 
 --     ticket_tier as odr_s_fla_tickets_tier, 
 --     fmc_s_fla_churnflag as odr_s_fla_final_churn, -- finalchurnflag, 
