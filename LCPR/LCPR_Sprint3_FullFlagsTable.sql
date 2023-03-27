@@ -13,9 +13,10 @@ SELECT date_trunc('month', date('2023-02-01')) AS input_month
 , fmc_table as (
 SELECT
     *
-FROM "db_stage_dev"."lcpr_fmc_table_feb_mar23" --- Make sure to set the month accordindly to the input month of parameters
-WHERE 
-    fmc_s_dim_month = (SELECT input_month FROM parameters)
+FROM "db_stage_dev"."lcpr_fmc_table_jan_mar23" --- Make sure to set the month accordindly to the input month of parameters
+UNION ALL (SELECT * FROM "db_stage_dev"."lcpr_fmc_table_feb_mar23") --- Take all the FMC tables available for the calculations that require more than 1 month.
+-- WHERE 
+    -- fmc_s_dim_month = (SELECT input_month FROM parameters)
 )
 
 , repeated_accounts as (
@@ -233,7 +234,40 @@ INNER JOIN new_customers b
 
 --- ### ### ### MRC Changes
 
+, bom_previous_month as (
+SELECT 
+    fmc_s_dim_month as fmc_s_dim_month_prev, 
+    fix_s_att_account, 
+    fmc_s_att_account, 
+    fix_b_mes_mrc as fix_b_mes_mrc_prev
+FROM fmc_table_adj
+WHERE 
+    fmc_s_dim_month = (SELECT input_month FROM parameters) - interval '1' month  
+    and fix_b_mes_overdue < 85
+)
+ 
+ , eom_current_month as (
+SELECT
+    fmc_s_dim_month, 
+    fix_s_att_account, 
+    fix_e_mes_overdue,
+    fix_e_mes_mrc
+FROM fmc_table_adj
+WHERE
+    fmc_s_dim_month = (SELECT input_month FROM parameters) 
+    and fix_e_mes_overdue < 85
+)
 
+ , mrc_increases as (
+SELECT  
+    c.fix_s_att_account,
+    fmc_s_dim_month, 
+    case when fix_e_mes_mrc/fix_b_mes_mrc_prev > 1.05 then c.fix_s_att_account else null end as mrc_increase_flag,
+    case when fix_e_mes_mrc/fix_b_mes_mrc_prev <= 1.05 then c.fix_s_att_account else null end as no_plan_change  
+FROM bom_previous_month p 
+LEFT JOIN eom_current_month c 
+    ON p.fix_s_att_account = c.fix_s_att_account
+)
 
 --- ### ### ### Billing Claims
 
@@ -254,7 +288,8 @@ FROM fmc_table_adj F
 LEFT JOIN early_tickets I
     ON cast(F.fix_s_att_account as varchar) = cast(I.fix_s_att_account as varchar) and F.fmc_s_dim_month = I.install_month
 WHERE
-    fix_e_att_active = 1 
+    F.fmc_s_dim_month = (SELECT input_month FROM parameters)
+    and fix_e_att_active = 1 
 )
 
 , flag4_outlier_installs as (
@@ -264,6 +299,16 @@ SELECT
 FROM flag3_early_tickets F
 LEFT JOIN outlier_installs I
     ON cast(F.fix_s_att_account as varchar) = cast(I.account_id as varchar) and F.fmc_s_dim_month = I.month
+)
+
+, flag5_mrc_increases as (
+SELECT 
+    F.*, 
+    mrc_increase_flag,
+    no_plan_change
+FROM flag4_outlier_installs F
+LEFT JOIN mrc_increases I
+    ON cast(F.fix_s_att_account as varchar) = cast(I.fix_s_att_account as varchar) and F.fmc_s_dim_month = I.fmc_s_dim_month
 )
 
 --- ### ### ### Final table
@@ -293,11 +338,11 @@ SELECT
     -- count(distinct F_SoftDxFlag) Unique_SoftDx,
     -- count(distinct F_NeverPaidFlag) Unique_NeverPaid,
     -- count(distinct F_LongInstallFlag) Unique_LongInstall,
-    -- count(distinct F_MRCIncreases) Unique_MRCIncrease,
-    -- count(distinct F_NoPlanChangeFlag) Unique_NoPlanChanges,
+    count(distinct mrc_increase_flag) as opd_s_mes_uni_mrcincrease,
+    count(distinct no_plan_change) as opd_s_mes_uni_noplan_changes,
     -- count(distinct F_MountingBillFlag) Unique_Mountingbills, 
     count(distinct early_ticket_flag) as opd_s_mes_uni_early_tickets
-FROM flag4_outlier_installs
+FROM flag5_mrc_increases
 WHERE 
     fmc_s_fla_churnflag != 'Fixed Churner' 
     and fmc_s_fla_waterfall not in ('Downsell-Fixed Customer Gap', 'Fixed Base Exception', 'Churn Exception') 
@@ -333,7 +378,6 @@ SELECT * FROM sprint3_full_table_LikeJam
 -- ORDER BY 1
 
 --- Outlier Install Times
-
 -- SELECT
 --     opd_s_dim_month, 
 --     sum(opd_s_mes_long_installs) as outlier_installs, 
@@ -344,7 +388,14 @@ SELECT * FROM sprint3_full_table_LikeJam
 -- ORDER BY 1
 
 --- MRC Changes
-
+-- SELECT 
+--     opd_s_dim_month, 
+--     sum(opd_s_mes_uni_mrcincrease) as mrc_increase, 
+--     sum(opd_s_mes_uni_noplan_changes) as no_plan_changes, 
+--     (cast(sum(opd_s_mes_uni_mrcincrease) as double)/cast(sum(opd_s_mes_uni_noplan_changes) as double)) as mrc_increases_kpi
+-- FROM sprint3_full_table_LikeJam  
+-- GROUP BY 1 
+-- ORDER BY 1
 
 
 --- Billing Claims
