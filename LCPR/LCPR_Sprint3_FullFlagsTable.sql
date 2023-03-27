@@ -44,6 +44,7 @@ LEFT JOIN repeated_accounts R
 --- --- --- New customers base
 , new_customers_pre as (
 SELECT 
+    *,
     cast(cast(first_value(connect_dte_sbb) over (partition by sub_acct_no_sbb order by date(dt) desc) as timestamp) as date) as fix_b_att_maxstart,   
     sub_acct_no_sbb as fix_s_att_account 
 FROM "lcpr.stage.prod"."insights_customer_services_rates_lcpr" --- Making my own calculation for new sales
@@ -120,7 +121,62 @@ FROM "lcpr.stage.dev"."truckrolls"
 
 --- ### ### ### Never Paid
 
+, new_customers_3_m as (
+SELECT 
+    delinquency_days,  
+    SUB_ACCT_NO_SBB as day_85 
+FROM "lcpr.stage.prod"."insights_customer_services_rates_lcpr" 
+WHERE 
+    play_type <> '0P'
+    and cust_typ_sbb = 'RES' 
+    and delinquency_days >= 85 
+    and date_trunc('month',date(dt)) = (select input_month + interval '3' month from parameters) 
+ORDER BY 1
+)
+    
+, new_customers_2_m as (
+SELECT 
+    delinquency_days,  
+    SUB_ACCT_NO_SBB as day_60 
+FROM "lcpr.stage.prod"."insights_customer_services_rates_lcpr" 
+WHERE 
+    play_type <> '0P'
+    and cust_typ_sbb = 'RES' 
+    and delinquency_days >= 60 
+    and date_trunc('month',date(dt)) = (select input_month + interval '2' month from parameters) 
+ORDER BY 1
+)
+    
+, new_customers_1_m as (
+SELECT 
+    delinquency_days,  
+    SUB_ACCT_NO_SBB as day_30 
+FROM "lcpr.stage.prod"."insights_customer_services_rates_lcpr" 
+WHERE 
+    play_type <> '0P'
+    and cust_typ_sbb = 'RES' 
+    and delinquency_days >= 30 
+    and date_trunc('month',date(dt)) = (select input_month + interval '1' month from parameters) 
+ORDER BY 1
+)
 
+, never_paid as (
+SELECT
+    install_month, 
+    a.fix_s_att_account,
+    count(distinct day_30) as day_30s,  
+    count(distinct day_60) as day_60s, 
+    count(distinct day_85) as day_85s
+FROM new_customers a
+LEFT JOIN new_customers_1_m b
+    ON cast(b.day_30 as varchar) = cast(a.fix_s_att_account as varchar) 
+LEFT JOIN new_customers_2_m c 
+    ON cast(c.day_60 as varchar) = cast(a.fix_s_att_account as varchar)
+LEFT JOIN new_customers_3_m d
+    ON cast(d.day_85 as varchar) = cast(a.fix_s_att_account as varchar)
+GROUP BY 1, 2
+ORDER BY 1, 2
+)
 
 --- ### ### ### Early Tickets
 
@@ -322,17 +378,28 @@ GROUP BY 1, 2
 
 --- ### ### ### Joining all flags
 
+, flag2_never_paid as (
+SELECT 
+    F.*, 
+    day_30s,  
+    day_60s, 
+    day_85s
+FROM fmc_table_adj F
+LEFT JOIN never_paid I
+    ON cast(F.fix_s_att_account as varchar) = cast(I.fix_s_att_account as varchar) and F.fmc_s_dim_month = I.install_month
+WHERE
+    F.fmc_s_dim_month = (SELECT input_month FROM parameters)
+    and fix_e_att_active = 1 
+)
+
 , flag3_early_tickets as (
 SELECT 
     F.*, 
     early_ticket_flag, 
     new_sales_flag
-FROM fmc_table_adj F
+FROM flag2_never_paid F
 LEFT JOIN early_tickets I
     ON cast(F.fix_s_att_account as varchar) = cast(I.fix_s_att_account as varchar) and F.fmc_s_dim_month = I.install_month
-WHERE
-    F.fmc_s_dim_month = (SELECT input_month FROM parameters)
-    and fix_e_att_active = 1 
 )
 
 , flag4_outlier_installs as (
@@ -397,7 +464,7 @@ SELECT
     -- Ticket_Month, 
     -- count(distinct F_SalesFlag) Unique_Sales, 
     -- count(distinct F_SoftDxFlag) Unique_SoftDx,
-    -- count(distinct F_NeverPaidFlag) Unique_NeverPaid,
+    sum(day_85s) as opd_s_mes_uni_never_paid,
     -- count(distinct F_LongInstallFlag) Unique_LongInstall,
     count(distinct mrc_increase_flag) as opd_s_mes_uni_mrcincrease,
     count(distinct no_plan_change) as opd_s_mes_uni_noplan_changes,
@@ -415,7 +482,7 @@ ORDER BY 1, 2, 3, 4, 5
 -- ORDER BY 1, 2, 3, 4, 5, 7, 16, 17, 18
 )
 
---- --- --- Panamás structure
+--- --- --- Panama's structure
 
 
 --- --- ---
@@ -427,11 +494,18 @@ SELECT * FROM sprint3_full_table_LikeJam
 
 
 --- Never paid
-
+-- SELECT 
+--     opd_s_dim_month, 
+--     sum(opd_s_mes_uni_never_paid) as never_paid_85d, 
+--     sum(opd_s_mes_sales) as new_customers_base, 
+--     (cast(sum(opd_s_mes_uni_never_paid) as double)/cast(sum(opd_s_mes_sales) as double)) as never_paid_85d_kpi
+-- FROM sprint3_full_table_LikeJam 
+-- GROUP BY 1 
+-- ORDER BY 1
 
 --- Early Tickets
 -- SELECT 
---     odr_s_dim_month, 
+--     opd_s_dim_month, 
 --     sum(opd_s_mes_uni_early_tickets) as early_tickets, 
 --     sum(opd_s_mes_sales) as new_customers_base, 
 --     (cast(sum(opd_s_mes_uni_early_tickets) as double)/cast(sum(opd_s_mes_sales) as double)) as early_tickets_kpi
@@ -478,3 +552,4 @@ SELECT * FROM sprint3_full_table_LikeJam
 -- FROM sprint3_full_table_LikeJam  
 -- GROUP BY 1 
 -- ORDER BY 1
+
