@@ -117,7 +117,32 @@ FROM "lcpr.stage.dev"."truckrolls"
 
 --- ### ### ### Straight to Soft Dx
 
+, invol_funnel_fields as (
+SELECT 
+    date(date_trunc('month', date(dt))) as Month,
+    date(dt) as dt,
+    date(date_trunc('month', bill_from_dte_sbb)) as billmonth,
+    date(bill_from_dte_sbb) as billday,
+    d.sub_acct_no_sbb,
+    d.delinquency_days as duedays,
+    first_value(delinquency_days) over(partition by sub_acct_no_sbb, date(date_trunc('month', date(dt))) order by date(dt) desc) as LastDueDay
+FROM "lcpr.stage.prod"."insights_customer_services_rates_lcpr" d
+WHERE 
+    play_type != '0P'
+    AND cust_typ_sbb = 'RES' 
+    and date_trunc('month', date(dt)) = (SELECT input_month FROM parameters)
+)
 
+, soft_dx AS(
+SELECT 
+    f.*,
+    case when duedays = 50 then sub_acct_no_sbb else null end as soft_dx_flag
+FROM fmc_table_adj f 
+LEFT JOIN invol_funnel_fields b 
+    ON f.fix_s_att_account = b.sub_acct_no_sbb and f.fmc_s_dim_month = b.Month
+WHERE
+    fmc_s_dim_month = (SELECT input_month FROM parameters)
+)
 
 --- ### ### ### Never Paid
 
@@ -378,18 +403,27 @@ GROUP BY 1, 2
 
 --- ### ### ### Joining all flags
 
+, flag1_soft_dx as (
+SELECT 
+    F.*, 
+    soft_dx_flag
+FROM fmc_table_adj F
+LEFT JOIN soft_dx I
+    ON cast(F.fix_s_att_account as varchar) = cast(I.fix_s_att_account as varchar) and F.fmc_s_dim_month = I.fmc_s_dim_month
+WHERE
+    F.fmc_s_dim_month = (SELECT input_month FROM parameters)
+    and F.fix_e_att_active = 1 
+)
+
 , flag2_never_paid as (
 SELECT 
     F.*, 
     day_30s,  
     day_60s, 
     day_85s
-FROM fmc_table_adj F
+FROM flag1_soft_dx F
 LEFT JOIN never_paid I
     ON cast(F.fix_s_att_account as varchar) = cast(I.fix_s_att_account as varchar) and F.fmc_s_dim_month = I.install_month
-WHERE
-    F.fmc_s_dim_month = (SELECT input_month FROM parameters)
-    and fix_e_att_active = 1 
 )
 
 , flag3_early_tickets as (
@@ -463,7 +497,7 @@ SELECT
     -- Install_Month, 
     -- Ticket_Month, 
     -- count(distinct F_SalesFlag) Unique_Sales, 
-    -- count(distinct F_SoftDxFlag) Unique_SoftDx,
+    count(distinct soft_dx_flag) as opd_s_mes_uni_softdx,
     sum(day_85s) as opd_s_mes_uni_never_paid,
     -- count(distinct F_LongInstallFlag) Unique_LongInstall,
     count(distinct mrc_increase_flag) as opd_s_mes_uni_mrcincrease,
@@ -484,6 +518,54 @@ ORDER BY 1, 2, 3, 4, 5
 
 --- --- --- Panama's structure
 
+-- , sprint3_full_table_LikeJam as (
+-- SELECT  
+--     DISTINCT month
+--     ,B_Final_TechFlag
+--     ,B_FMCSegment
+--     ,B_FMCType
+--     ,E_Final_TechFlag
+--     ,E_FMCSegment
+--     ,E_FMCType
+--     ,b_final_tenure
+--     ,e_final_tenure
+--     ,B_FixedTenure
+--     ,E_FixedTenure
+--     ,finalchurnflag
+--     ,fixedchurnflag
+--     ,fixedchurntype
+--     ,fixedmainmovement
+--     ,waterfall_flag
+--     ,mobile_activeeom
+--     ,mobilechurnflag
+--     ,interaction_tier
+--     ,ticket_tier
+--     ,finalaccount
+--     ,fixedaccount
+--     ,interactions
+--     ,tickets
+--     ,number_tickets AS prevnumber_tickets
+--     ,records_per_user
+--     ,number_tickets AS number_tickets
+--     ,outlier_repair
+--     ,users_truckrolls
+--     ,missed_visits
+-- FROM missed_visits_flag
+-- )
+
+-- SELECT  month
+--         ,B_Final_TechFlag, B_FMCSegment, B_FMCType,E_Final_TechFlag, E_FMCSegment, E_FMCType,b_final_tenure,e_final_tenure,B_FixedTenure,E_FixedTenure,interaction_tier,ticket_tier,finalchurnflag,fixedchurnflag,waterfall_flag
+--         ,count(DISTINCT finalaccount) AS Total_Accounts
+--         ,count(DISTINCT fixedaccount) AS Fixed_Accounts
+--         ,count(DISTINCT interactions) AS Usersinteractions
+--         ,count(DISTINCT tickets) AS Userstickets
+--         ,round(SUM(number_tickets),0) AS number_tickets
+--         ,count(DISTINCT outlier_repair) AS outlier_repairs
+--         ,count(DISTINCT users_truckrolls) AS users_truckrolls
+--         ,count(DISTINCT missed_visits) AS missed_visits
+-- FROM final_fields
+-- WHERE ((Fixedchurntype != 'Fixed Voluntary Churner' AND Fixedchurntype != 'Fixed Involuntary Churner') OR Fixedchurntype IS NULL) AND finalchurnflag !='Fixed Churner'
+-- GROUP BY 1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16
 
 --- --- ---
 SELECT * FROM sprint3_full_table_LikeJam
@@ -492,6 +574,14 @@ SELECT * FROM sprint3_full_table_LikeJam
 
 --- Straight to Soft Dx
 
+-- SELECT
+--     opd_s_dim_month, 
+--     sum(opd_s_mes_uni_softdx) as soft_dx,
+--     sum(opd_s_mes_sales) as new_customers_base,
+--     (cast(sum(opd_s_mes_uni_softdx) as double)/cast(sum(opd_s_mes_sales) as double)) as soft_dx_kpi
+-- FROM sprint3_full_table_LikeJam 
+-- GROUP BY 1 
+-- ORDER BY 1
 
 --- Never paid
 -- SELECT 
@@ -552,4 +642,3 @@ SELECT * FROM sprint3_full_table_LikeJam
 -- FROM sprint3_full_table_LikeJam  
 -- GROUP BY 1 
 -- ORDER BY 1
-
