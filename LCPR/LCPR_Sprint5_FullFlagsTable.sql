@@ -11,9 +11,10 @@ parameters as (SELECT date_trunc('month', date ('2023-02-01')) as input_month)
 , fmc_table as (
 SELECT
     *
-FROM "db_stage_dev"."lcpr_fmc_table_feb_mar23" --- Make sure to set the month accordindly to the input month of parameters
-WHERE 
-    fmc_s_dim_month = (SELECT input_month FROM parameters)
+FROM "db_stage_dev"."lcpr_fmc_table_jan_mar23" --- Make sure to set the month accordindly to the input month of parameters
+UNION ALL (SELECT * FROM "db_stage_dev"."lcpr_fmc_table_feb_mar23")
+-- WHERE 
+--     fmc_s_dim_month = (SELECT input_month FROM parameters)
 )
 
 , repeated_accounts as (
@@ -309,7 +310,8 @@ SELECT
         end)
     as number_tickets
 FROM users_tickets
-WHERE interaction_id is not null
+WHERE
+    interaction_id is not null
 GROUP BY 1, 2
 )
 
@@ -328,7 +330,8 @@ FROM fmc_table_adj F
 LEFT JOIN interactions_tier I
     ON cast(F.fix_s_att_account as varchar) = cast(I.account_id as varchar) and F.fmc_s_dim_month = I.interaction_month
 WHERE
-    fix_e_att_active = 1 
+    fmc_s_dim_month = (SELECT input_month FROM parameters)
+    and fix_e_att_active = 1 
 )
 
 , flag2_reiterative_tickets as (
@@ -361,7 +364,7 @@ SELECT
     fmc_e_fla_fmc as odr_e_fla_fmc_type, -- E_FMCType, 
     fmc_e_fla_tenure as odr_e_fla_final_tenure, ---E_FinalTenureSegment,
     interaction_tier as odr_s_fla_interaction_tier, 
-    -- ticket_tier as odr_s_fla_tickets_tier, 
+    ticket_tier as odr_s_fla_tickets_tier, 
     count(distinct fix_s_att_account) as odr_s_mes_active_base, -- as activebase, 
     count(distinct interactions) as odr_s_mes_user_interactions,
     count(distinct case when ticket_tier = '1' then fix_s_att_account else null end) as odr_s_mes_one_ticket, -- as one_ticket,  
@@ -376,46 +379,46 @@ WHERE
     fmc_s_fla_churnflag != 'Fixed Churner' 
     and fmc_s_fla_waterfall not in ('Downsell-Fixed Customer Gap', '6.Null last day', 'Churn Exception')
     and fix_s_fla_mainmovement != '6.Null last day' --- Be careful! This is not the final mainmovement flag.
-GROUP BY 1, 2, 3, 4, 5, 6
+GROUP BY 1, 2, 3, 4, 5, 6, 7    
 ORDER BY 1, 2, 3, 4, 5, 6
 )
 
 
 --- --- --- Panama´s structure
-, sprint5_full_table_LikePan as (
-SELECT  
-    fmc_s_dim_month as odr_s_dim_month,
-    fmc_b_fla_tech as odr_b_fla_final_tech, -- B_Final_TechFlag, 
-    fmc_b_fla_fmcsegment as odr_b_fla_fmc_segment, -- B_FMCSegment, 
-    fmc_b_fla_fmc as odr_b_fla_fmc_type, -- B_FMCType, 
-    fmc_e_fla_tech as odr_e_fla_final_tech, -- E_Final_TechFlag, 
-    fmc_e_fla_fmcsegment as odr_e_fla_fmc_segment, -- E_FMCSegment, 
-    fmc_e_fla_fmc as odr_e_fla_fmc_type, -- E_FMCType, 
-    fmc_b_fla_tenure as odr_b_fla_final_tenure, -- b_final_tenure, 
-    fmc_e_fla_tenure as odr_e_fla_final_tenure, -- e_final_tenure, 
-    fix_b_fla_tenure as odr_b_fla_tenure, -- B_FixedTenure, 
-    fix_e_fla_tenure as odr_e_fla_tenure, -- E_FixedTenure, 
-    interaction_tier as odr_s_fla_interaction_tier, 
-    ticket_tier as odr_s_fla_tickets_tier, 
-    fmc_s_fla_churnflag as odr_s_fla_final_churn, -- finalchurnflag, 
-    fix_s_fla_churnflag as odr_s_fla_churn, -- fixedchurnflag, 
-    fmc_s_fla_waterfall as odr_s_fla_waterfall, -- waterfall_flag, 
-    count(distinct fix_s_att_account) as odr_s_mes_active_base, 
-    -- count(DISTINCT fixedaccount) AS Fixed_Accounts,
-    count(distinct interactions) as odr_s_mes_user_interactions, 
-    -- count(DISTINCT tickets) AS Userstickets, 
-    sum(number_tickets) as odr_s_mes_total_tickets
-    -- count(DISTINCT outlier_repair) AS outlier_repairs, 
-    -- count(DISTINCT users_truckrolls) AS users_truckrolls, 
-    -- count(DISTINCT missed_visits) AS missed_visits
-FROM flag3_tickets_per_month
-WHERE ((fmc_s_fla_churntype != 'Fixed Voluntary Churner' and fmc_s_fla_churntype != 'Fixed Involuntary Churner') or fmc_s_fla_churntype IS NULL) 
-    and fmc_s_fla_churnflag !='Fixed Churner'
-GROUP BY 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16
-)
+-- , sprint5_full_table_LikePan as (
+-- SELECT  
+--     fmc_s_dim_month as odr_s_dim_month,
+--     fmc_b_fla_tech as odr_b_fla_final_tech, -- B_Final_TechFlag, 
+--     fmc_b_fla_fmcsegment as odr_b_fla_fmc_segment, -- B_FMCSegment, 
+--     fmc_b_fla_fmc as odr_b_fla_fmc_type, -- B_FMCType, 
+--     fmc_e_fla_tech as odr_e_fla_final_tech, -- E_Final_TechFlag, 
+--     fmc_e_fla_fmcsegment as odr_e_fla_fmc_segment, -- E_FMCSegment, 
+--     fmc_e_fla_fmc as odr_e_fla_fmc_type, -- E_FMCType, 
+--     fmc_b_fla_tenure as odr_b_fla_final_tenure, -- b_final_tenure, 
+--     fmc_e_fla_tenure as odr_e_fla_final_tenure, -- e_final_tenure, 
+--     fix_b_fla_tenure as odr_b_fla_tenure, -- B_FixedTenure, 
+--     fix_e_fla_tenure as odr_e_fla_tenure, -- E_FixedTenure, 
+--     interaction_tier as odr_s_fla_interaction_tier, 
+--     ticket_tier as odr_s_fla_tickets_tier, 
+--     fmc_s_fla_churnflag as odr_s_fla_final_churn, -- finalchurnflag, 
+--     fix_s_fla_churnflag as odr_s_fla_churn, -- fixedchurnflag, 
+--     fmc_s_fla_waterfall as odr_s_fla_waterfall, -- waterfall_flag, 
+--     count(distinct fix_s_att_account) as odr_s_mes_active_base, 
+--     -- count(DISTINCT fixedaccount) AS Fixed_Accounts,
+--     count(distinct interactions) as odr_s_mes_user_interactions, 
+--     -- count(DISTINCT tickets) AS Userstickets, 
+--     sum(number_tickets) as odr_s_mes_total_tickets
+--     -- count(DISTINCT outlier_repair) AS outlier_repairs, 
+--     -- count(DISTINCT users_truckrolls) AS users_truckrolls, 
+--     -- count(DISTINCT missed_visits) AS missed_visits
+-- FROM flag3_tickets_per_month
+-- WHERE ((fmc_s_fla_churntype != 'Fixed Voluntary Churner' and fmc_s_fla_churntype != 'Fixed Involuntary Churner') or fmc_s_fla_churntype IS NULL) 
+--     and fmc_s_fla_churnflag !='Fixed Churner'
+-- GROUP BY 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16
+-- )
 
 --- --- ---
-SELECT * FROM sprint5_full_table_LikePan
+SELECT * FROM sprint5_full_table_LikeJam
 
 --- ### ### ### Specific numbers
 
@@ -423,14 +426,14 @@ SELECT * FROM sprint5_full_table_LikePan
 -- SELECT
 --     odr_s_fla_interaction_tier,
 --     sum(odr_s_mes_active_base) as num_cliets
--- FROM sprint5_full_table_LikePan
+-- FROM sprint5_full_table_LikeJam
 -- GROUP BY 1
 
 --- --- --- Reiterative tickets
 -- SELECT 
-    -- odr_s_fla_tickets_tier,
-    -- sum(odr_s_mes_active_base) as num_cliets
--- FROM sprint5_full_table_LikePan
+--     odr_s_fla_tickets_tier,
+--     sum(odr_s_mes_active_base) as num_cliets
+-- FROM sprint5_full_table_LikeJam
 -- GROUP BY 1
 
 --- --- --- Tickets per month
@@ -438,5 +441,4 @@ SELECT * FROM sprint5_full_table_LikePan
 --     sum(odr_s_mes_total_tickets) as number_tickets,
 --     sum(odr_s_mes_active_base) as active_base, 
 --     round(cast(sum(odr_s_mes_total_tickets) as double)/(cast(sum(odr_s_mes_active_base) as double)/100), 2) as tickets_per_100_users
--- FROM sprint5_full_table_LikePan
-
+-- FROM sprint5_full_table_LikeJam
