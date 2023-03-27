@@ -484,8 +484,8 @@ SELECT
     fmc_e_fla_fmc as odr_e_fla_fmc_type, -- E_FMCType, 
     fmc_e_fla_tenure as odr_e_fla_final_tenure, ---E_FinalTenureSegment,
     count(distinct fix_s_att_account) as odr_s_mes_active_base, -- as activebase, 
-    count(distinct new_sales_flag) as opd_s_mes_sales,-- sales_channel, 
-    -- sum(monthsale_flag) as Sales, 
+    -- sales_channel, 
+    count(distinct new_sales_flag) as opd_s_mes_sales, -- sum(monthsale_flag) as Sales, 
     -- sum(SoftDx_Flag) as Soft_Dx, 
     -- sum (NeverPaid_Flag) as NeverPaid,
     count(distinct outlier_install_flag) as opd_s_mes_long_installs, 
@@ -518,57 +518,52 @@ ORDER BY 1, 2, 3, 4, 5
 
 --- --- --- Panama's structure
 
--- , sprint3_full_table_LikeJam as (
--- SELECT  
---     DISTINCT month
---     ,B_Final_TechFlag
---     ,B_FMCSegment
---     ,B_FMCType
---     ,E_Final_TechFlag
---     ,E_FMCSegment
---     ,E_FMCType
---     ,b_final_tenure
---     ,e_final_tenure
---     ,B_FixedTenure
---     ,E_FixedTenure
---     ,finalchurnflag
---     ,fixedchurnflag
---     ,fixedchurntype
---     ,fixedmainmovement
---     ,waterfall_flag
---     ,mobile_activeeom
---     ,mobilechurnflag
---     ,interaction_tier
---     ,ticket_tier
---     ,finalaccount
---     ,fixedaccount
---     ,interactions
---     ,tickets
---     ,number_tickets AS prevnumber_tickets
---     ,records_per_user
---     ,number_tickets AS number_tickets
---     ,outlier_repair
---     ,users_truckrolls
---     ,missed_visits
--- FROM missed_visits_flag
--- )
-
--- SELECT  month
---         ,B_Final_TechFlag, B_FMCSegment, B_FMCType,E_Final_TechFlag, E_FMCSegment, E_FMCType,b_final_tenure,e_final_tenure,B_FixedTenure,E_FixedTenure,interaction_tier,ticket_tier,finalchurnflag,fixedchurnflag,waterfall_flag
---         ,count(DISTINCT finalaccount) AS Total_Accounts
---         ,count(DISTINCT fixedaccount) AS Fixed_Accounts
---         ,count(DISTINCT interactions) AS Usersinteractions
---         ,count(DISTINCT tickets) AS Userstickets
---         ,round(SUM(number_tickets),0) AS number_tickets
---         ,count(DISTINCT outlier_repair) AS outlier_repairs
---         ,count(DISTINCT users_truckrolls) AS users_truckrolls
---         ,count(DISTINCT missed_visits) AS missed_visits
--- FROM final_fields
--- WHERE ((Fixedchurntype != 'Fixed Voluntary Churner' AND Fixedchurntype != 'Fixed Involuntary Churner') OR Fixedchurntype IS NULL) AND finalchurnflag !='Fixed Churner'
--- GROUP BY 1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16
+, sprint3_full_table_LikePan as (
+SELECT  
+    fmc_s_dim_month as odr_s_dim_month, -- month
+    fmc_b_fla_tech as odr_b_fla_final_tech, -- B_Final_TechFlag, 
+    fmc_b_fla_fmcsegment as odr_b_fla_fmc_segment, -- B_FMCSegment,
+    fmc_b_fla_fmc as odr_b_fla_fmc_type, -- B_FMCType,
+    fmc_e_fla_tech as odr_e_fla_final_tech, -- E_Final_TechFlag, 
+    fmc_e_fla_fmcsegment as odr_e_fla_fmc_segment, -- E_FMCSegment,
+    fmc_e_fla_fmc as odr_e_fla_fmc_type, -- E_FMCType,
+    fmc_b_fla_tenure as odr_b_fla_final_tenure, -- b_final_tenure, 
+    fmc_e_fla_tenure as odr_e_fla_final_tenure, -- e_final_tenure,
+    fix_b_fla_tenure as odr_b_fla_tenure, -- B_FixedTenure, 
+    fix_e_fla_tenure as odr_e_fla_tenure, -- E_FixedTenure, 
+    count(distinct fix_s_att_account) as odr_s_mes_active_base, -- as activebase,
+    count(distinct new_sales_flag) as opd_s_mes_sales,
+    count(distinct soft_dx_flag) as opd_s_mes_uni_softdx,
+    sum(day_85s) as opd_s_mes_uni_never_paid,
+    count(distinct outlier_install_flag) as opd_s_mes_long_installs,
+    -- ,SUM(early_interaction_flag) AS Early_Issues
+    count(distinct early_ticket_flag) as opd_s_mes_uni_early_tickets,
+    -- count(distinct new_sales_flag) as opd_s_mes_mea_sales,
+    -- ,COUNT(DISTINCT F_SoftDxFlag) AS Unique_SoftDx
+    -- ,COUNT(DISTINCT F_NeverPaidFlag) AS Unique_NeverPaid
+    -- ,COUNT(DISTINCT F_LongInstallFlag) AS Unique_LongInstall
+    -- ,COUNT(DISTINCT F_EarlyInteractionFlag) AS Unique_EarlyInteraction
+    -- ,COUNT(DISTINCT F_EarlyTicketFlag) AS Unique_EarlyTicket
+    count(distinct billing_claim_flag) as opd_s_mes_uni_bill_claim,
+    count(distinct mrc_increase_flag) as opd_s_mes_uni_mrcincrease,
+    count(distinct no_plan_change) as opd_s_mes_uni_noplan_changes,
+    sum(mounting_bill_flag) as opd_s_mes_uni_moun_gbills
+    -- ,first_sales_chnl_eom
+    -- ,first_sales_chnl_bom
+    -- ,Last_Sales_CHNL_EOM
+    -- ,Last_Sales_CHNL_BOM 
+    -- ,sales_channel
+    -- ,sales_channel_so
+FROM flag7_mounting_bills
+WHERE 
+    ((fmc_s_fla_churntype != 'Fixed Voluntary Churner' and fmc_s_fla_churntype != 'Fixed Involuntary Churner') or fmc_s_fla_churntype IS NULL) 
+    and fmc_s_fla_churnflag !='Fixed Churner'
+GROUP BY 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11 -- first_sales_chnl_eom, first_sales_chnl_bom, Last_Sales_CHNL_EOM, Last_Sales_CHNL_BOM , sales_channel,sales_channel_so
+ORDER BY 1
+)
 
 --- --- ---
-SELECT * FROM sprint3_full_table_LikeJam
+SELECT * FROM sprint3_full_table_LikePan
 
 --- ### ### ### Specific numbers
 
