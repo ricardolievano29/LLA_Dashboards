@@ -11,7 +11,8 @@ parameters as (SELECT date_trunc('month', date ('2023-02-01')) as input_month)
 , fmc_table as (
 SELECT
     *
-FROM "db_stage_dev"."lcpr_fmc_table_jan_mar23" --- Make sure to set the month accordindly to the input month of parameters
+FROM "db_stage_dev"."lcpr_fmc_table_dec_mar23" --- Make sure to set the month accordindly to the input month of parameters
+UNION ALL (SELECT * FROM "db_stage_dev"."lcpr_fmc_table_jan_mar23")
 UNION ALL (SELECT * FROM "db_stage_dev"."lcpr_fmc_table_feb_mar23")
 -- WHERE 
 --     fmc_s_dim_month = (SELECT input_month FROM parameters)
@@ -362,7 +363,11 @@ SELECT
     fmc_e_fla_tech as odr_e_fla_final_tech, -- E_Final_Tech_Flag, 
     fmc_e_fla_fmcsegment as odr_e_fla_fmc_segment, -- E_FMC_Segment, 
     fmc_e_fla_fmc as odr_e_fla_fmc_type, -- E_FMCType, 
-    fmc_e_fla_tenure as odr_e_fla_final_tenure, ---E_FinalTenureSegment,
+    case 
+        when fmc_e_fla_tenure = 'Early Tenure' then 'Early-Tenure'
+        when fmc_e_fla_tenure = 'Mid Tenure' then 'Mid-Tenure'
+        when fmc_e_fla_tenure = 'Late Tenure' then 'Late-Tenure'
+    end as odr_e_fla_final_tenure, ---E_FinalTenureSegment,
     interaction_tier as odr_s_fla_interaction_tier, 
     ticket_tier as odr_s_fla_tickets_tier, 
     count(distinct fix_s_att_account) as odr_s_mes_active_base, -- as activebase, 
@@ -394,8 +399,16 @@ ORDER BY 1, 2, 3, 4, 5, 6
 --     fmc_e_fla_tech as odr_e_fla_final_tech, -- E_Final_TechFlag, 
 --     fmc_e_fla_fmcsegment as odr_e_fla_fmc_segment, -- E_FMCSegment, 
 --     fmc_e_fla_fmc as odr_e_fla_fmc_type, -- E_FMCType, 
---     fmc_b_fla_tenure as odr_b_fla_final_tenure, -- b_final_tenure, 
---     fmc_e_fla_tenure as odr_e_fla_final_tenure, -- e_final_tenure, 
+--     case 
+        -- when fmc_b_fla_tenure = 'Early Tenure' then 'Early-Tenure'
+        -- when fmc_b_fla_tenure = 'Mid Tenure' then 'Mid-Tenure'
+        -- when fmc_b_fla_tenure = 'Late Tenure' then 'Late-Tenure'
+    -- end as odr_b_fla_final_tenure, , -- b_final_tenure, 
+--     case 
+        -- when fmc_e_fla_tenure = 'Early Tenure' then 'Early-Tenure'
+        -- when fmc_e_fla_tenure = 'Mid Tenure' then 'Mid-Tenure'
+        -- when fmc_e_fla_tenure = 'Late Tenure' then 'Late-Tenure'
+    -- end as odr_e_fla_final_tenure, -- e_final_tenure, 
 --     fix_b_fla_tenure as odr_b_fla_tenure, -- B_FixedTenure, 
 --     fix_e_fla_tenure as odr_e_fla_tenure, -- E_FixedTenure, 
 --     interaction_tier as odr_s_fla_interaction_tier, 
