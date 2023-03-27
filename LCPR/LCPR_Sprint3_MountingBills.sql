@@ -11,7 +11,7 @@ SELECT
     date_trunc('month', date(dt)) as fmc_s_dim_month,
     delinquency_days, 
     sub_acct_no_sbb as fix_s_att_account, 
-    count(distinct case when delinquency_days = 60 then sub_acct_no_sbb else null end) as mounting_bill_flag
+    sum(case when delinquency_days = 60 then 1 else 0 end) as mounting_bill_flag
 FROM "lcpr.stage.prod"."insights_customer_services_rates_lcpr" 
 WHERE 
     play_type <> '0P'
@@ -40,5 +40,3 @@ SELECT
     count(distinct fix_s_att_account) as active_base, 
     cast(sum(mounting_bill_flag) as double)/cast(count(distinct fix_s_att_account) as double) as mounting_bills_kpi
 FROM mounting_bills
-
-
