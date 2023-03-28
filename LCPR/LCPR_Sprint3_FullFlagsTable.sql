@@ -6,7 +6,7 @@ WITH
 
 --- --- --- Month you wish the code run for
 parameters as (
-SELECT date_trunc('month', date('2023-02-01')) AS input_month
+SELECT date_trunc('month', date('2023-01-01')) AS input_month
 )
 
 --- --- --- FMC table
@@ -489,7 +489,7 @@ SELECT
     -- Install_Month, 
     -- Ticket_Month, 
     -- count(distinct F_SalesFlag) Unique_Sales, 
-    count(distinct soft_dx_flag) as opd_s_mes_uni_softdx
+    count(distinct soft_dx_flag) as opd_s_mes_uni_softdx,
     sum(day_85s) as opd_s_mes_uni_never_paid,
     -- count(distinct F_LongInstallFlag) Unique_LongInstall,
     count(distinct mrc_increase_flag) as opd_s_mes_uni_mrcincrease,
