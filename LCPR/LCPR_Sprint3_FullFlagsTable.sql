@@ -118,31 +118,16 @@ FROM "lcpr.stage.dev"."truckrolls"
 
 --- ### ### ### Straight to Soft Dx
 
-, invol_funnel_fields as (
-SELECT 
-    date(date_trunc('month', date(dt))) as Month,
-    date(dt) as dt,
-    date(date_trunc('month', bill_from_dte_sbb)) as billmonth,
-    date(bill_from_dte_sbb) as billday,
-    d.sub_acct_no_sbb,
-    d.delinquency_days as duedays,
-    first_value(delinquency_days) over(partition by sub_acct_no_sbb, date(date_trunc('month', date(dt))) order by date(dt) desc) as LastDueDay
-FROM "lcpr.stage.prod"."insights_customer_services_rates_lcpr" d
+, soft_dx as (
+SELECT
+    date_trunc('month', date(connect_dte_sbb)) as install_month, 
+    sub_acct_no_sbb as fix_s_att_account, 
+    case when delinquency_days = 50 then sub_acct_no_sbb else null end as soft_dx_flag
+FROM "lcpr.stage.prod"."insights_customer_services_rates_lcpr" --- Making my own calculation for new sales
 WHERE 
     play_type != '0P'
-    AND cust_typ_sbb = 'RES' 
-    and date_trunc('month', date(dt)) = (SELECT input_month FROM parameters)
-)
-
-, soft_dx AS(
-SELECT 
-    f.*,
-    case when duedays = 50 then sub_acct_no_sbb else null end as soft_dx_flag
-FROM fmc_table_adj f 
-LEFT JOIN invol_funnel_fields b 
-    ON f.fix_s_att_account = b.sub_acct_no_sbb and f.fmc_s_dim_month = b.Month
-WHERE
-    fmc_s_dim_month = (SELECT input_month FROM parameters)
+    and cust_typ_sbb = 'RES' 
+    and date_trunc('month', date(connect_dte_sbb)) = (SELECT input_month FROM parameters) 
 )
 
 --- ### ### ### Never Paid
@@ -410,7 +395,7 @@ SELECT
     soft_dx_flag
 FROM fmc_table_adj F
 LEFT JOIN soft_dx I
-    ON cast(F.fix_s_att_account as varchar) = cast(I.fix_s_att_account as varchar) and F.fmc_s_dim_month = I.fmc_s_dim_month
+    ON cast(F.fix_s_att_account as varchar) = cast(I.fix_s_att_account as varchar) and date(fmc_s_dim_month) = date(I.install_month)
 WHERE
     F.fmc_s_dim_month = (SELECT input_month FROM parameters)
     and F.fix_e_att_active = 1 
@@ -504,7 +489,7 @@ SELECT
     -- Install_Month, 
     -- Ticket_Month, 
     -- count(distinct F_SalesFlag) Unique_Sales, 
-    count(distinct soft_dx_flag) as opd_s_mes_uni_softdx,
+    count(distinct soft_dx_flag) as opd_s_mes_uni_softdx
     sum(day_85s) as opd_s_mes_uni_never_paid,
     -- count(distinct F_LongInstallFlag) Unique_LongInstall,
     count(distinct mrc_increase_flag) as opd_s_mes_uni_mrcincrease,
