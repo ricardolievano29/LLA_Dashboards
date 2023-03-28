@@ -6,7 +6,7 @@ WITH
 
 --- --- --- Month you wish the code run for
 parameters as (
-SELECT date_trunc('month', date('2023-01-01')) AS input_month
+SELECT date_trunc('month', date('2023-02-01')) AS input_month
 )
 
 --- --- --- FMC table
@@ -43,16 +43,25 @@ LEFT JOIN repeated_accounts R
 )
 
 --- --- --- New customers base
+, dna_adj as (
+SELECT
+    *
+FROM "lcpr.stage.prod"."insights_customer_services_rates_lcpr"
+WHERE 
+    play_type != '0P'
+    and cust_typ_sbb = 'RES' 
+    -- and date_trunc('month',date(connect_dte_sbb)) = (SELECT input_month FROM parameters) 
+)
+
+
 , new_customers_pre as (
 SELECT 
     *,
     cast(cast(first_value(connect_dte_sbb) over (partition by sub_acct_no_sbb order by date(dt) desc) as timestamp) as date) as fix_b_att_maxstart,   
     sub_acct_no_sbb as fix_s_att_account 
-FROM "lcpr.stage.prod"."insights_customer_services_rates_lcpr" --- Making my own calculation for new sales
+FROM dna_adj
 WHERE 
-    play_type != '0P'
-    and cust_typ_sbb = 'RES' 
-    and date_trunc('month',date(connect_dte_sbb)) = (SELECT input_month FROM parameters) 
+    date_trunc('month',date(connect_dte_sbb)) = (SELECT input_month FROM parameters) 
 ORDER BY 1
 )
 
@@ -123,11 +132,11 @@ SELECT
     date_trunc('month', date(connect_dte_sbb)) as install_month, 
     sub_acct_no_sbb as fix_s_att_account, 
     case when delinquency_days = 50 then sub_acct_no_sbb else null end as soft_dx_flag
-FROM "lcpr.stage.prod"."insights_customer_services_rates_lcpr" --- Making my own calculation for new sales
+FROM dna_adj
 WHERE 
-    play_type != '0P'
-    and cust_typ_sbb = 'RES' 
-    and date_trunc('month', date(connect_dte_sbb)) = (SELECT input_month FROM parameters) 
+    -- play_type != '0P'
+    -- and cust_typ_sbb = 'RES' 
+    date_trunc('month', date(connect_dte_sbb)) = (SELECT input_month FROM parameters) 
 )
 
 --- ### ### ### Never Paid
@@ -136,12 +145,13 @@ WHERE
 SELECT 
     delinquency_days,  
     SUB_ACCT_NO_SBB as day_85 
-FROM "lcpr.stage.prod"."insights_customer_services_rates_lcpr" 
+FROM dna_adj
 WHERE 
-    play_type <> '0P'
-    and cust_typ_sbb = 'RES' 
-    and delinquency_days >= 85 
-    and date_trunc('month',date(dt)) = (select input_month + interval '3' month from parameters) 
+    -- play_type <> '0P'
+    -- and cust_typ_sbb = 'RES' 
+    delinquency_days >= 85 
+    and date_trunc('month', date(dt)) = (SELECT input_month + interval '3' month FROM parameters) 
+    -- and date_trunc('month', date(connect_dte_sbb)) = (SELECT input_month FROM parameters) 
 ORDER BY 1
 )
     
@@ -149,12 +159,13 @@ ORDER BY 1
 SELECT 
     delinquency_days,  
     SUB_ACCT_NO_SBB as day_60 
-FROM "lcpr.stage.prod"."insights_customer_services_rates_lcpr" 
+FROM dna_adj
 WHERE 
-    play_type <> '0P'
-    and cust_typ_sbb = 'RES' 
-    and delinquency_days >= 60 
-    and date_trunc('month',date(dt)) = (select input_month + interval '2' month from parameters) 
+    -- play_type <> '0P'
+    -- and cust_typ_sbb = 'RES' 
+    delinquency_days >= 60 
+    and date_trunc('month',date(dt)) = (SELECT input_month + interval '2' month FROM parameters) 
+    -- and date_trunc('month', date(connect_dte_sbb)) = (SELECT input_month FROM parameters) 
 ORDER BY 1
 )
     
@@ -162,12 +173,13 @@ ORDER BY 1
 SELECT 
     delinquency_days,  
     SUB_ACCT_NO_SBB as day_30 
-FROM "lcpr.stage.prod"."insights_customer_services_rates_lcpr" 
+FROM dna_adj
 WHERE 
-    play_type <> '0P'
-    and cust_typ_sbb = 'RES' 
-    and delinquency_days >= 30 
-    and date_trunc('month',date(dt)) = (select input_month + interval '1' month from parameters) 
+    -- play_type <> '0P'
+    -- and cust_typ_sbb = 'RES' 
+    delinquency_days >= 30 
+    and date_trunc('month',date(dt)) = (SELECT input_month + interval '1' month FROM parameters) 
+    -- and date_trunc('month', date(connect_dte_sbb)) = (SELECT input_month FROM parameters) 
 ORDER BY 1
 )
 
@@ -175,9 +187,9 @@ ORDER BY 1
 SELECT
     install_month, 
     a.fix_s_att_account,
-    count(distinct day_30) as day_30s,  
-    count(distinct day_60) as day_60s, 
-    count(distinct day_85) as day_85s
+    day_30, 
+    day_60, 
+    day_85
 FROM new_customers a
 LEFT JOIN new_customers_1_m b
     ON cast(b.day_30 as varchar) = cast(a.fix_s_att_account as varchar) 
@@ -185,8 +197,8 @@ LEFT JOIN new_customers_2_m c
     ON cast(c.day_60 as varchar) = cast(a.fix_s_att_account as varchar)
 LEFT JOIN new_customers_3_m d
     ON cast(d.day_85 as varchar) = cast(a.fix_s_att_account as varchar)
-GROUP BY 1, 2
-ORDER BY 1, 2
+-- GROUP BY 1, 2
+-- ORDER BY 1, 2
 )
 
 --- ### ### ### Early Tickets
@@ -366,11 +378,11 @@ SELECT
     delinquency_days, 
     sub_acct_no_sbb as fix_s_att_account, 
     sum(case when delinquency_days = 60 then sub_acct_no_sbb else 0 end) as mounting_bill_flag
-FROM "lcpr.stage.prod"."insights_customer_services_rates_lcpr" 
+FROM dna_adj
 WHERE 
-    play_type <> '0P'
-    and cust_typ_sbb = 'RES' 
-    and date_trunc('month', date(dt)) = (SELECT input_month FROM parameters)
+    -- play_type <> '0P'
+    -- and cust_typ_sbb = 'RES' 
+    date_trunc('month', date(dt)) = (SELECT input_month FROM parameters)
 GROUP BY 1, 2, 3
 )
 
@@ -404,9 +416,9 @@ WHERE
 , flag2_never_paid as (
 SELECT 
     F.*, 
-    day_30s,  
-    day_60s, 
-    day_85s
+    day_30,  
+    day_60, 
+    day_85
 FROM flag1_soft_dx F
 LEFT JOIN never_paid I
     ON cast(F.fix_s_att_account as varchar) = cast(I.fix_s_att_account as varchar) and F.fmc_s_dim_month = I.install_month
@@ -490,12 +502,12 @@ SELECT
     -- Ticket_Month, 
     -- count(distinct F_SalesFlag) Unique_Sales, 
     count(distinct soft_dx_flag) as opd_s_mes_uni_softdx,
-    sum(day_85s) as opd_s_mes_uni_never_paid,
+    count(distinct day_85) as opd_s_mes_uni_never_paid,
     -- count(distinct F_LongInstallFlag) Unique_LongInstall,
     count(distinct mrc_increase_flag) as opd_s_mes_uni_mrcincrease,
     count(distinct no_plan_change) as opd_s_mes_uni_noplan_changes,
     count(distinct mounting_bill_flag) as opd_s_mes_uni_moun_gbills, 
-    count(distinct early_ticket_flag) as opd_s_mes_uni_early_tickets, 
+    count(distinct early_ticket_flag) as opd_s_mes_uni_early_tickets,
     count(distinct billing_claim_flag) as opd_s_mes_uni_bill_claim
 FROM flag7_mounting_bills
 WHERE 
