@@ -1,83 +1,64 @@
---- ##### LCPR SPRINT 3 - OPERATIONAL DRIVERS - NEVER PAID #####
+--- ##### LCPR SPRINT 3 - OPERATIONAL DRIVERS - FULL FLAGS TABLE #####
 
-WITH 
-parameters as (
-SELECT date_trunc('month', date('2022-12-01')) as input_month
-)
----New customer directly from the DNA
+WITH
+
+parameters as (SELECT date('2022-12-01') as input_month)
+
 , new_customers_pre as (
 SELECT 
-    (cast(cast(first_value(connect_dte_sbb) over (partition by sub_acct_no_sbb order by date(dt) desc) as timestamp) as date)) as fix_b_att_maxstart,   
-    SUB_ACCT_NO_SBB as fix_s_att_account 
-FROM "lcpr.stage.prod"."insights_customer_services_rates_lcpr" 
+    *,
+    cast(cast(first_value(connect_dte_sbb) over (partition by sub_acct_no_sbb order by date(dt) desc) as timestamp) as date) as fix_b_att_maxstart,   
+    sub_acct_no_sbb as fix_s_att_account 
+FROM "lcpr.stage.prod"."insights_customer_services_rates_lcpr" --- Making my own calculation for new sales
 WHERE 
-    play_type <> '0P'
+    play_type != '0P'
     and cust_typ_sbb = 'RES' 
-    and delinquency_days = 0 
-HAVING 
-    date_trunc('month',date(CONNECT_DTE_SBB)) = (select input_month from parameters) 
+    and date_trunc('month',date(connect_dte_sbb)) = (SELECT input_month FROM parameters) 
 ORDER BY 1
 )
-    
-, new_customer as (
-SELECT 
+
+-- , new_customers as (
+-- SELECT
+--     fix_s_dim_month as install_month,
+--     fix_b_att_maxstart, 
+--     fix_s_att_account
+-- FROM "db_stage_dev"."lcpr_fixed_table_jan_mar17"
+-- WHERE
+--     fix_s_fla_mainmovement = '4.New Customer' --- Getting the new sales directly from the FMC (or Fixed) table.
+-- )
+
+, new_customers as (
+SELECT
     date_trunc('month', fix_b_att_maxstart) as install_month, 
-    fix_b_att_maxstart,  
-    fix_s_att_account 
-FROM new_customers_pre 
+    fix_b_att_maxstart, 
+    fix_s_att_account,
+    fix_s_att_account as new_sales_flag
+FROM new_customers_pre
 )
-   
+
 , new_customers_3_m as (
 SELECT 
-    delinquency_days,  
-    SUB_ACCT_NO_SBB as day_85 
+    SUB_ACCT_NO_SBB as fix_s_att_account, 
+    case when delinquency_days >= 85 then SUB_ACCT_NO_SBB else null end as day_85s
 FROM "lcpr.stage.prod"."insights_customer_services_rates_lcpr" 
 WHERE 
     play_type <> '0P'
     and cust_typ_sbb = 'RES' 
-    and delinquency_days >= 85 
-    and date_trunc('month',date(dt)) = (select input_month + interval '3' month from parameters) 
+    -- and delinquency_days >= 85 
+    and date_trunc('month',date(dt)) = (select input_month from parameters) + interval '3' month 
+    -- and date_trunc('month', date(connect_dte_sbb)) = (SELECT input_month FROM parameters)
 ORDER BY 1
 )
-    
-, new_customers_2_m as (
-SELECT 
-    delinquency_days,  
-    SUB_ACCT_NO_SBB as day_60 
-FROM "lcpr.stage.prod"."insights_customer_services_rates_lcpr" 
-WHERE 
-    play_type <> '0P'
-    and cust_typ_sbb = 'RES' 
-    and delinquency_days >= 60 
-    and date_trunc('month',date(dt)) = (select input_month + interval '2' month from parameters) 
-ORDER BY 1
-)
-    
-, new_customers_1_m as (
-SELECT 
-    delinquency_days,  
-    SUB_ACCT_NO_SBB as day_30 
-FROM "lcpr.stage.prod"."insights_customer_services_rates_lcpr" 
-WHERE 
-    play_type <> '0P'
-    and cust_typ_sbb = 'RES' 
-    and delinquency_days >= 30 
-    and date_trunc('month',date(dt)) = (select input_month + interval '1' month from parameters) 
-ORDER BY 1
-) 
-   
+
+, never_paid as (
 SELECT
-    install_month, 
-    count(distinct day_30) as day_30s,  
-    count(distinct day_60) as day_60s, 
-    count(distinct day_85) as day_85s, 
-    count(distinct fix_s_att_account) as new_customer 
-FROM new_customer 
-LEFT JOIN new_customers_1_m 
-    ON day_30 = fix_s_att_account  
-LEFT JOIN new_customers_2_m 
-    ON day_60 = fix_s_att_account 
-LEFT JOIN new_customers_3_m 
-    ON day_85 = fix_s_att_account  
-GROUP BY 1 
-ORDER BY 1
+    a.fix_s_att_account,
+    day_85s
+FROM new_customers a
+LEFT JOIN new_customers_3_m b
+    ON cast(a.fix_s_att_account as varchar) = cast(b.fix_s_att_account as varchar)
+-- GROUP BY 1, 2
+-- ORDER BY 1, 2
+)
+
+SELECT count(distinct day_85s), count(distinct fix_s_att_account) FROM never_paid
