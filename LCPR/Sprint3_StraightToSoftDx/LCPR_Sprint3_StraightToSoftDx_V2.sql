@@ -83,5 +83,47 @@ WHERE
     and fix_e_att_active = 1 
 )
 
+SELECT 
+    fmc_s_dim_month as opd_s_dim_month,
+    fmc_e_fla_tech as odr_e_fla_final_tech, -- E_Final_Tech_Flag, 
+    fmc_e_fla_fmcsegment as odr_e_fla_fmc_segment, -- E_FMC_Segment, 
+    fmc_e_fla_fmc as odr_e_fla_fmc_type, -- E_FMCType, 
+    case 
+        when fmc_e_fla_tenure = 'Early Tenure' then 'Early-Tenure'
+        when fmc_e_fla_tenure = 'Mid Tenure' then 'Mid-Tenure'
+        when fmc_e_fla_tenure = 'Late Tenure' then 'Late-Tenure'
+    end as odr_e_fla_final_tenure, ---E_FinalTenureSegment,
+    count(distinct fix_s_att_account) as odr_s_mes_active_base, -- as activebase, 
+    -- sales_channel, 
+    count(distinct new_sales2m_flag) as opd_s_mes_sales, -- sum(monthsale_flag) as Sales, 
+    -- sum(SoftDx_Flag) as Soft_Dx, 
+    -- sum (NeverPaid_Flag) as NeverPaid,
+    -- count(distinct outlier_install_flag) as opd_s_mes_long_installs, 
+    -- sum (increase_flag) as MRC_Increases, 
+    -- sum (no_plan_change_flag) as NoPlan_Changes, 
+    -- sum(mountingbill_flag) as MountingBills, 
+    -- sum(earlyticket_flag) as EarlyTickets,
+    -- Sales_Month, 
+    -- Install_Month, 
+    -- Ticket_Month, 
+    -- count(distinct F_SalesFlag) Unique_Sales, 
+    count(distinct soft_dx_flag) as opd_s_mes_uni_softdx
+    -- count(distinct day_85) as opd_s_mes_uni_never_paid,
+    -- count(distinct F_LongInstallFlag) Unique_LongInstall,
+    -- count(distinct mrc_increase_flag) as opd_s_mes_uni_mrcincrease,
+    -- count(distinct no_plan_change) as opd_s_mes_uni_noplan_changes,
+    -- count(distinct mounting_bill_flag) as opd_s_mes_uni_moun_gbills, 
+    -- count(distinct early_ticket_flag) as opd_s_mes_uni_early_tickets
+    -- count(distinct billing_claim_flag) as opd_s_mes_uni_bill_claim
+FROM flag_soft_dx
+WHERE 
+    fmc_s_fla_churnflag != 'Fixed Churner' 
+    and fmc_s_fla_waterfall not in ('Downsell-Fixed Customer Gap', 'Fixed Base Exception', 'Churn Exception') 
+    and fix_s_fla_mainmovement != '6.Null last day'
+GROUP BY 1, 2, 3, 4, 5
+ORDER BY 1, 2, 3, 4, 5
+-- GROUP BY 1, 2, 3, 4, 5, 7, 16, 17, 18
+-- ORDER BY 1, 2, 3, 4, 5, 7, 16, 17, 18
+
 -- SELECT count(distinct new_sales2m_flag) FROM new_customers2m
-SELECT count(distinct soft_dx_flag), count(distinct new_sales2m_flag) FROM flag_soft_dx
+-- SELECT count(distinct soft_dx_flag), count(distinct new_sales2m_flag) FROM flag_soft_dx
