@@ -214,7 +214,7 @@ GROUP BY 1
 , early_tickets as (
 SELECT 
     fix_s_att_account, 
-    new_sales_flag,
+    new_sales_flag as new_sales2m_flag,
     install_month, 
     first_interaction_start_month, 
     first_interaction_date,
@@ -227,9 +227,118 @@ WHERE
     date_trunc('month', date(fix_b_att_maxstart)) = (SELECT input_month FROM parameters) - interval '2' month
 )
 
+
+--- ### ### ### Outlier Install Times
+
+--- Num: New installations with a duration over 6 days
+--- Denom: Month new sales
+
+--- This KPI doesn't use an specific cohort; it is calculated for the current month.
+
+, installations as (
 SELECT
-    count(distinct early_ticket_flag), 
-    count(distinct new_sales_flag)
-FROM early_tickets
--- ORDER BY 1 asc
--- LIMIT 100
+    distinct account_id, 
+    max(order_start_date) as order_start_date, 
+    max(completed_date) as completed_date
+FROM "lcpr.stage.prod"."so_ln_lcpr"
+WHERE
+    org_id = 'LCPR' and org_cntry = 'PR'
+    and order_status = 'COMPLETE'
+    and command_id = 'CONNECT'
+GROUP BY 1
+)
+
+, outlier_installs as (
+SELECT
+    distinct fix_s_att_account,
+    fix_b_att_maxstart,
+    new_sales_flag,
+    install_month,
+    date(order_start_date) as order_start_date, 
+    date(completed_date) as completed_date, 
+    case when date_diff('day', date(order_start_date), date(completed_date)) > 6 then account_id else null end as outlier_install_flag
+FROM new_customers3m_now a
+LEFT JOIN installations b
+    ON cast(a.fix_s_att_account as varchar) = cast(b.account_id as varchar)
+WHERE
+    date_trunc('month', date(fix_b_att_maxstart)) = (SELECT input_month FROM parameters)
+)
+
+--- ### ### ### Joining all the flags
+
+, flag3_early_tickets as (
+SELECT
+    F.*, 
+    early_ticket_flag, 
+    new_sales2m_flag
+FROM fmc_table_adj F
+LEFT JOIN early_tickets I
+    ON cast(F.fix_s_att_account as varchar) = cast(I.fix_s_att_account as varchar) and date(F.fmc_s_dim_month) = date(I.install_month + interval '2' month)
+WHERE
+    F.fmc_s_dim_month = (SELECT input_month FROM parameters)
+    and F.fix_e_att_active = 1 
+)
+
+, flag4_outlier_installs as (
+SELECT
+    F.*, 
+    new_sales_flag, 
+    outlier_install_flag
+FROM flag3_early_tickets F
+LEFT JOIN outlier_installs I
+    ON cast(F.fix_s_att_account as varchar) = cast(I.fix_s_att_account as varchar) and date(F.fmc_s_dim_month) = date(I.install_month)
+)
+
+--- ### ### ### Final table
+, final_table as (
+SELECT 
+    fmc_s_dim_month as opd_s_dim_month,
+    fmc_e_fla_tech as odr_e_fla_final_tech, -- E_Final_Tech_Flag, 
+    fmc_e_fla_fmcsegment as odr_e_fla_fmc_segment, -- E_FMC_Segment, 
+    fmc_e_fla_fmc as odr_e_fla_fmc_type, -- E_FMCType, 
+    case 
+        when fmc_e_fla_tenure = 'Early Tenure' then 'Early-Tenure'
+        when fmc_e_fla_tenure = 'Mid Tenure' then 'Mid-Tenure'
+        when fmc_e_fla_tenure = 'Late Tenure' then 'Late-Tenure'
+    end as odr_e_fla_final_tenure, ---E_FinalTenureSegment,
+    count(distinct fix_s_att_account) as odr_s_mes_active_base, -- as activebase, 
+    -- sales_channel, 
+    count(distinct new_sales_flag) as opd_s_mes_sales, -- sum(monthsale_flag) as Sales, 
+    count(distinct new_sales2m_flag) as opd_s_mes_sales2m,
+    -- sum(SoftDx_Flag) as Soft_Dx, 
+    -- sum (NeverPaid_Flag) as NeverPaid,
+    count(distinct outlier_install_flag) as opd_s_mes_long_installs, 
+    -- sum (increase_flag) as MRC_Increases, 
+    -- sum (no_plan_change_flag) as NoPlan_Changes, 
+    -- sum(mountingbill_flag) as MountingBills, 
+    -- sum(earlyticket_flag) as EarlyTickets,
+    -- Sales_Month, 
+    -- Install_Month, 
+    -- Ticket_Month, 
+    -- count(distinct F_SalesFlag) Unique_Sales, 
+    -- count(distinct soft_dx_flag) as opd_s_mes_uni_softdx,
+    -- count(distinct day_85) as opd_s_mes_uni_never_paid,
+    -- count(distinct F_LongInstallFlag) Unique_LongInstall,
+    -- count(distinct mrc_increase_flag) as opd_s_mes_uni_mrcincrease,
+    -- count(distinct no_plan_change) as opd_s_mes_uni_noplan_changes,
+    -- count(distinct mounting_bill_flag) as opd_s_mes_uni_moun_gbills, 
+    count(distinct early_ticket_flag) as opd_s_mes_uni_early_tickets
+    -- count(distinct billing_claim_flag) as opd_s_mes_uni_bill_claim
+FROM flag4_outlier_installs
+WHERE 
+    fmc_s_fla_churnflag != 'Fixed Churner' 
+    and fmc_s_fla_waterfall not in ('Downsell-Fixed Customer Gap', 'Fixed Base Exception', 'Churn Exception') 
+    and fix_s_fla_mainmovement != '6.Null last day'
+GROUP BY 1, 2, 3, 4, 5
+ORDER BY 1, 2, 3, 4, 5
+)
+
+
+
+-- SELECT
+--     count(distinct outlier_install_flag),
+--     count(distinct new_sales_flag)
+-- FROM outlier_installs
+-- WHERE cast(fix_s_att_account as varchar) = '8211790230284246'
+
+SELECT sum(opd_s_mes_long_installs), sum(opd_s_mes_sales) FROM final_table
