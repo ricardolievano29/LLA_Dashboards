@@ -264,6 +264,75 @@ WHERE
     date_trunc('month', date(fix_b_att_maxstart)) = (SELECT input_month FROM parameters)
 )
 
+--- ### ### ### MRC Changes
+
+--- Num: Customers with >5% MRC changes between 2 months
+--- Denom:  Active customers without plan changes
+
+--- As this KPI requires a comparison between two months, it uses data from the previous month.
+
+, bom_previous_month as (
+SELECT 
+    fmc_s_dim_month as fmc_s_dim_month_prev, 
+    fix_s_att_account, 
+    fmc_s_att_account, 
+    fix_b_mes_mrc as fix_b_mes_mrc_prev
+FROM fmc_table_adj
+WHERE 
+    fmc_s_dim_month = (SELECT input_month FROM parameters) - interval '1' month  
+    and fix_b_mes_overdue < 85
+)
+ 
+ , eom_current_month as (
+SELECT
+    fmc_s_dim_month, 
+    fix_s_att_account, 
+    fix_e_mes_overdue,
+    fix_e_mes_mrc
+FROM fmc_table_adj
+WHERE
+    fmc_s_dim_month = (SELECT input_month FROM parameters) 
+    and fix_e_mes_overdue < 85
+)
+
+ , mrc_increases as (
+SELECT  
+    c.fix_s_att_account,
+    fmc_s_dim_month, 
+    case when fix_e_mes_mrc/fix_b_mes_mrc_prev > 1.05 then c.fix_s_att_account else null end as mrc_increase_flag,
+    case when fix_e_mes_mrc/fix_b_mes_mrc_prev <= 1.05 then c.fix_s_att_account else null end as no_plan_change  
+FROM bom_previous_month p 
+LEFT JOIN eom_current_month c 
+    ON p.fix_s_att_account = c.fix_s_att_account
+)
+
+---  ### ### ### Billing Claims
+
+--- Num: Number of users with bill claims
+--- Denom: Active customers
+
+--- This KPI requires an association between users and interactions identified as billing claims. Then, we'll find those interactions and generate a flag to the customer that made it. As a time range is not specified it is assumed that we are looking for biling claims interactions just in the current month.
+
+, billing_claims as (
+SELECT 
+    fix_s_att_account,
+    fmc_s_dim_month,
+    account_id as billing_claim_flag, 
+    interaction_date
+FROM fmc_table_adj A
+LEFT JOIN interactions_fields2 B
+    ON cast(A.fix_s_att_account as varchar) = cast(B.account_id as varchar) and date(A.fmc_s_dim_month) = date(B.month)
+WHERE 
+    fmc_s_dim_month = (SELECT input_month FROM parameters)
+    and month = (SELECT input_month FROM parameters)
+    and account_type = 'RES'
+    and (interaction_status = 'Closed')
+    and (interaction_purpose_descrip in ('Adjustment Request', 'Approved Adjustment', 'Billing', 'Cancelled Np', 'Chuito Retained', 'Vd: Billing', 'Vd: Cant Afford', 'Vd: Closed Buss', 'Vd: Deceased', 'E-Bill', 'G:customer Billable', 'Not Retained', 'Np: Cancelled Np', 'Np: Payment Plan', 'Np: Promise To Pay', 'Promise To Pay', 'Ret- Adjustment', 'Ret- Promise-To-Pay', 'Ret-Bill Expln', 'Ret-Direct Debit', 'Ret-Pay Meth Expln', 'Ret-Payment', 'Ret-Right Pricing', 'Rt: Price Increase', 'Rt: Rate Pricing')
+    or (lower(interaction_purpose_descrip) like '%ci:%' and interaction_purpose_descrip not in  ('Ci: Cable Card Req', 'Ci: Inst/Tc Status', 'Ci: Install Stat', 'Ci: Installer / Tech'))
+    or (lower(interaction_purpose_descrip) like '%payment%')
+    or (lower(interaction_purpose_descrip) like '%vd%Ccn%'))
+)
+
 --- ### ### ### Joining all the flags
 
 , flag3_early_tickets as (
@@ -287,6 +356,25 @@ SELECT
 FROM flag3_early_tickets F
 LEFT JOIN outlier_installs I
     ON cast(F.fix_s_att_account as varchar) = cast(I.fix_s_att_account as varchar) and date(F.fmc_s_dim_month) = date(I.install_month)
+)
+
+, flag5_mrc_changes as (
+SELECT
+    F.*, 
+    no_plan_change, 
+    mrc_increase_flag
+FROM flag4_outlier_installs F
+LEFT JOIN mrc_increases I
+    ON cast(F.fix_s_att_account as varchar) = cast(I.fix_s_att_account as varchar) and date(F.fmc_s_dim_month) = date(I.fmc_s_dim_month) 
+)
+
+, flag6_billing_claims as (
+SELECT 
+    F.*, 
+    billing_claim_flag
+FROM flag5_mrc_changes F
+LEFT JOIN billing_claims I
+    ON cast(F.fix_s_att_account as varchar) = cast(I.fix_s_att_account as varchar) and date(F.fmc_s_dim_month) = date(I.fmc_s_dim_month)
 )
 
 --- ### ### ### Final table
@@ -319,12 +407,12 @@ SELECT
     -- count(distinct soft_dx_flag) as opd_s_mes_uni_softdx,
     -- count(distinct day_85) as opd_s_mes_uni_never_paid,
     -- count(distinct F_LongInstallFlag) Unique_LongInstall,
-    -- count(distinct mrc_increase_flag) as opd_s_mes_uni_mrcincrease,
-    -- count(distinct no_plan_change) as opd_s_mes_uni_noplan_changes,
+    count(distinct mrc_increase_flag) as opd_s_mes_uni_mrcincrease,
+    count(distinct no_plan_change) as opd_s_mes_uni_noplan_changes,
     -- count(distinct mounting_bill_flag) as opd_s_mes_uni_moun_gbills, 
-    count(distinct early_ticket_flag) as opd_s_mes_uni_early_tickets
-    -- count(distinct billing_claim_flag) as opd_s_mes_uni_bill_claim
-FROM flag4_outlier_installs
+    count(distinct early_ticket_flag) as opd_s_mes_uni_early_tickets,
+    count(distinct billing_claim_flag) as opd_s_mes_uni_bill_claim
+FROM flag6_billing_claims
 WHERE 
     fmc_s_fla_churnflag != 'Fixed Churner' 
     and fmc_s_fla_waterfall not in ('Downsell-Fixed Customer Gap', 'Fixed Base Exception', 'Churn Exception') 
@@ -341,4 +429,4 @@ ORDER BY 1, 2, 3, 4, 5
 -- FROM outlier_installs
 -- WHERE cast(fix_s_att_account as varchar) = '8211790230284246'
 
-SELECT sum(opd_s_mes_long_installs), sum(opd_s_mes_sales) FROM final_table
+SELECT sum(opd_s_mes_uni_bill_claim), sum(odr_s_mes_active_base) FROM final_table
