@@ -432,6 +432,7 @@ SELECT
     -- sales_channel, 
     count(distinct new_sales_flag) as opd_s_mes_sales, -- sum(monthsale_flag) as Sales, 
     count(distinct new_sales2m_flag) as opd_s_mes_sales2m,
+    -- count(distinct new_sales2m_flag) as opd_s_mes_sales3m,
     -- sum(SoftDx_Flag) as Soft_Dx, 
     -- sum (NeverPaid_Flag) as NeverPaid,
     count(distinct outlier_install_flag) as opd_s_mes_long_installs, 
