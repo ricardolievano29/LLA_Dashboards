@@ -333,6 +333,36 @@ WHERE
     or (lower(interaction_purpose_descrip) like '%vd%Ccn%'))
 )
 
+--- ### ### ### Mounting Bills
+
+--- Num: Customers with 60 days overdue
+--- Denom: Active customers
+
+--- As time range is not specified, we are taking the DNA for the current month and putting a flag on each customer that, at some point of this month, reached 60 days of overdue.
+
+--- We only flag the 60 days overdue once because the DNA records the status of a client each day of the month.
+
+, usefulfields as (
+SELECT  
+    date_trunc('month', date(dt)) as fmc_s_dim_month,
+    delinquency_days, 
+    sub_acct_no_sbb as fix_s_att_account, 
+    case when delinquency_days = 60 then sub_acct_no_sbb else null end as mounting_bill_flag
+FROM relevant_dna
+WHERE 
+    date_trunc('month', date(dt)) = (SELECT input_month FROM parameters)
+)
+
+, mounting_bills as (
+ SELECT 
+    a.fmc_s_dim_month,
+    a.fix_s_att_account,
+    mounting_bill_flag
+FROM fmc_table_adj a 
+LEFT JOIN usefulfields b 
+    ON cast(a.fix_s_att_account as varchar) = cast(b.fix_s_att_account as varchar) and date(a.fmc_s_dim_month) = date(b.fmc_s_dim_month)
+ )
+
 --- ### ### ### Joining all the flags
 
 , flag3_early_tickets as (
@@ -377,6 +407,15 @@ LEFT JOIN billing_claims I
     ON cast(F.fix_s_att_account as varchar) = cast(I.fix_s_att_account as varchar) and date(F.fmc_s_dim_month) = date(I.fmc_s_dim_month)
 )
 
+, flag7_mounting_bills as (
+SELECT
+    F.*, 
+    mounting_bill_flag
+FROM flag6_billing_claims F
+LEFT JOIN mounting_bills I
+    ON cast(F.fix_s_att_account as varchar) = cast(I.fix_s_att_account as varchar) and date(F.fmc_s_dim_month) = date(I.fmc_s_dim_month)
+)
+
 --- ### ### ### Final table
 , final_table as (
 SELECT 
@@ -409,10 +448,10 @@ SELECT
     -- count(distinct F_LongInstallFlag) Unique_LongInstall,
     count(distinct mrc_increase_flag) as opd_s_mes_uni_mrcincrease,
     count(distinct no_plan_change) as opd_s_mes_uni_noplan_changes,
-    -- count(distinct mounting_bill_flag) as opd_s_mes_uni_moun_gbills, 
+    count(distinct mounting_bill_flag) as opd_s_mes_uni_moun_gbills, 
     count(distinct early_ticket_flag) as opd_s_mes_uni_early_tickets,
     count(distinct billing_claim_flag) as opd_s_mes_uni_bill_claim
-FROM flag6_billing_claims
+FROM flag7_mounting_bills
 WHERE 
     fmc_s_fla_churnflag != 'Fixed Churner' 
     and fmc_s_fla_waterfall not in ('Downsell-Fixed Customer Gap', 'Fixed Base Exception', 'Churn Exception') 
@@ -421,12 +460,6 @@ GROUP BY 1, 2, 3, 4, 5
 ORDER BY 1, 2, 3, 4, 5
 )
 
+SELECT * FROM final_table
 
-
--- SELECT
---     count(distinct outlier_install_flag),
---     count(distinct new_sales_flag)
--- FROM outlier_installs
--- WHERE cast(fix_s_att_account as varchar) = '8211790230284246'
-
-SELECT sum(opd_s_mes_uni_bill_claim), sum(odr_s_mes_active_base) FROM final_table
+-- SELECT sum(opd_s_mes_uni_moun_gbills), sum(odr_s_mes_active_base) FROM final_table
