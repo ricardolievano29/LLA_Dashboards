@@ -341,7 +341,7 @@ FROM tickets_count
 
 --- ### ### ### ### ### TICKETS PER MONTH ### ### ### ### ###
 
---- Num: Total tickets
+--- Num: Total tickets 
 --- Denom: Active base
 
 --- For this KPI we check the interactions associated to tickets and count how many of them we had in the current month.
