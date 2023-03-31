@@ -1,0 +1,70 @@
+WITH
+
+parameters as (
+SELECT date_trunc('month', date('2023-01-01')) AS input_month
+)
+
+, relevant_dna as (
+SELECT
+    *
+FROM "lcpr.stage.prod"."insights_customer_services_rates_lcpr"
+WHERE 
+    play_type != '0P'
+    and cust_typ_sbb = 'RES' 
+    and date_trunc('month', date(connect_dte_sbb)) between ((SELECT input_month FROM parameters) - interval '3' month) and ((SELECT input_month FROM parameters))
+)
+
+, new_customers3m_now_pre as (
+SELECT
+    cast(cast(first_value(connect_dte_sbb) over (partition by sub_acct_no_sbb order by DATE(dt) DESC) as timestamp) as date) as fix_b_att_maxstart,   
+    SUB_ACCT_NO_SBB as fix_s_att_account, 
+    delinquency_days
+FROM relevant_dna
+ORDER BY 1
+)
+    
+, new_customers3m_now as (   
+SELECT 
+    date_trunc('month', fix_b_att_maxstart) as install_month, 
+    fix_b_att_maxstart,
+    fix_s_att_account, 
+    fix_s_att_account as new_sales_flag,
+    delinquency_days
+FROM new_customers3m_now_pre
+)
+
+, installations as (
+SELECT
+    distinct account_id, 
+    max(order_start_date) as order_start_date, 
+    max(completed_date) as completed_date
+FROM "lcpr.stage.prod"."so_ln_lcpr"
+WHERE
+    org_id = 'LCPR' and org_cntry = 'PR'
+    and order_status = 'COMPLETE'
+    and command_id = 'CONNECT'
+GROUP BY 1
+)
+
+, installs_vs_creation as (
+SELECT
+    distinct fix_s_att_account,
+    max(fix_b_att_maxstart) as fix_b_att_maxstart,
+    max(date(order_start_date)) as order_start_date, 
+    max(date(completed_date)) as completed_date, 
+    max(date_diff('day', date(order_start_date), date(completed_date))) as date_df
+FROM new_customers3m_now a
+LEFT JOIN installations b
+    ON cast(a.fix_s_att_account as varchar) = cast(b.account_id as varchar)
+WHERE
+    date_trunc('month', date(fix_b_att_maxstart)) = (SELECT input_month FROM parameters)
+GROUP BY 1
+)
+
+SELECT 
+    fix_s_att_account,
+    fix_b_att_maxstart, 
+    order_start_date, 
+    date_diff('day', date(order_start_date), date(fix_b_att_maxstart)) as date_df 
+FROM installs_vs_creation
+WHERE order_start_date is not null
