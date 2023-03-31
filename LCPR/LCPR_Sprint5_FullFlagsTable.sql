@@ -84,14 +84,38 @@ FROM "lcpr.stage.dev"."truckrolls"
 
 --- ### ### ### ### ### REPEATED CALLERS ### ### ### ### ###
 
+--- % users with one call
+--- Num: Customers with 1 call
+--- Denom: Active base
+
+--- % users with 2 calls
+--- Num: Customers with 2 calls
+--- Denom: Active base
+
+--- % users with 3 or more calls
+--- Num: Customers with 3 or more calls
+--- Denom: Active base
+
+--- This KPI requires us to check the Interactions Table for the last 2 months. However, the denominator is the active base in the current month, which we obtain from the FMC.
+
+, interactions_count_pre as (
+SELECT
+    account_id,
+    interaction_id,
+    interaction_month, 
+    interaction_date,
+    first_value(interaction_date) over(partition by account_id, date_trunc('month', interaction_date) order by interaction_date desc) as last_interaction_date
+FROM interactions_fields2
+)
+
 , interactions_count as (
 SELECT
     interaction_month, 
     account_id, 
     count(distinct interaction_id) as interactions
-FROM interactions_fields2
+FROM interactions_count_pre
 WHERE
-    interaction_date between date_add('day', -60, interaction_date) and interaction_date --- This is the Moving Window
+    interaction_date between date_add('day', -60, last_interaction_date) and interaction_date --- This is the Moving Window
 GROUP BY 1, 2
 )
 
@@ -109,6 +133,20 @@ FROM interactions_count
 
 
 --- ### ### ### ### ### REITERATIVE TICKETS ### ### ### ### ###
+
+--- % users with one ticket
+--- Num: Customers with one ticket
+--- Denom: Active base
+
+--- % users with two tickets
+--- Num: Customers with two tickets
+--- Denom: Active base
+
+--- % users with three or more tickets
+--- Num: Customers with 3 or more tickets
+--- Denom: Active base
+
+--- Again, we need to check the Interactions Table for the last 2 months, but in this case we are focusing just in interactions associated to a tech ticket.
 
 , users_tickets_pre as (
 SELECT
@@ -293,13 +331,26 @@ FROM tickets_count
 )
 
 
---- ### ### ### ### ### TTICKETS PER MONTH ### ### ### ### ###
+--- ### ### ### ### ### OUTLIER REPAIR TIMES ### ### ### ### ###
+
+--- Skipped for now.
+
+--- ### ### ### ### ### MISSED VISITS ### ### ### ### ###
+
+--- Skipped for now.
+
+--- ### ### ### ### ### TICKETS PER MONTH ### ### ### ### ###
+
+--- Num: Total tickets
+--- Denom: Active base
+
+--- For this KPI we check the interactions associated to tickets and count how many of them we had in the current month.
+
 
 , tickets_per_month as (
 SELECT
     date_trunc('month', interaction_date) as month, 
     account_id, 
-    -- other_interaction_info10,
     count(distinct 
         case 
             when techticket_flag is null and truckroll_flag is null then null
@@ -316,7 +367,7 @@ GROUP BY 1, 2
 
 --- ### ### ### ### ### NODES TICKET DENSITY ### ### ### ### ###
 
---- It's in another script to match with the CX Table Structure
+--- It is in another script to match with the CX Table Structure
 
 --- ### ### ### ### ### JOINING ALL FLAGS ### ### ### ### ###
 
