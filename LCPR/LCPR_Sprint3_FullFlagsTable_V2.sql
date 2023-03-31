@@ -13,7 +13,7 @@ SELECT date_trunc('month', date('2023-02-01')) AS input_month
 , fmc_table as (
 SELECT
     *
-FROM "db_stage_dev"."lcpr_fmc_table_dec_mar23" --- Make sure to set the month accordindly to the input month of parameters
+FROM "db_stage_dev"."lcpr_fmc_table_dec_mar23"
 UNION ALL (SELECT * FROM "db_stage_dev"."lcpr_fmc_table_jan_mar23")
 UNION ALL (SELECT * FROM "db_stage_dev"."lcpr_fmc_table_feb_mar23")
 -- WHERE 
@@ -154,7 +154,7 @@ GROUP BY 1
 --- This KPI uses the sales of three months ago and checks how many of those new customers achieved a 85-days overdue. Therefore, the cohort is m-3.
 
 --- We take the clients connected 3 months ago and flag those who achieved an overdue of 85 days in the following months
-, never_paid as (
+, never_paid as ( --- This calculation is incomplete because an analysis using the Payments Table is needed.
 SELECT 
     install_month, 
     fix_b_att_maxstart,
@@ -278,7 +278,7 @@ SELECT
     distinct account_id, 
     max(order_start_date) as order_start_date, 
     max(completed_date) as completed_date
-FROM "lcpr.stage.prod"."so_ln_lcpr"
+FROM "lcpr.stage.prod"."so_ln_lcpr" --- The ln SO table is used because is the only that allow us to identify new installations with the command_id column.
 WHERE
     org_id = 'LCPR' and org_cntry = 'PR'
     and order_status = 'COMPLETE'
@@ -365,7 +365,7 @@ WHERE
     and month = (SELECT input_month FROM parameters)
     and account_type = 'RES'
     and (interaction_status = 'Closed')
-    and (interaction_purpose_descrip in ('Adjustment Request', 'Approved Adjustment', 'Billing', 'Cancelled Np', 'Chuito Retained', 'Vd: Billing', 'Vd: Cant Afford', 'Vd: Closed Buss', 'Vd: Deceased', 'E-Bill', 'G:customer Billable', 'Not Retained', 'Np: Cancelled Np', 'Np: Payment Plan', 'Np: Promise To Pay', 'Promise To Pay', 'Ret- Adjustment', 'Ret- Promise-To-Pay', 'Ret-Bill Expln', 'Ret-Direct Debit', 'Ret-Pay Meth Expln', 'Ret-Payment', 'Ret-Right Pricing', 'Rt: Price Increase', 'Rt: Rate Pricing')
+    and (interaction_purpose_descrip in ('Adjustment Request', 'Approved Adjustment', 'Billing', 'Cancelled Np', 'Chuito Retained', 'Vd: Billing', 'Vd: Cant Afford', 'Vd: Closed Buss', 'Vd: Deceased', 'E-Bill', 'G:customer Billable', 'Not Retained', 'Np: Cancelled Np', 'Np: Payment Plan', 'Np: Promise To Pay', 'Promise To Pay', 'Ret- Adjustment', 'Ret- Promise-To-Pay', 'Ret-Bill Expln', 'Ret-Direct Debit', 'Ret-Pay Meth Expln', 'Ret-Payment', 'Ret-Right Pricing', 'Rt: Price Increase', 'Rt: Rate Pricing') --- Adapt to lower() in case capital letters are used.
     or (lower(interaction_purpose_descrip) like '%ci:%' and interaction_purpose_descrip not in  ('Ci: Cable Card Req', 'Ci: Inst/Tc Status', 'Ci: Install Stat', 'Ci: Installer / Tech'))
     or (lower(interaction_purpose_descrip) like '%payment%')
     or (lower(interaction_purpose_descrip) like '%vd%Ccn%'))
