@@ -11,22 +11,20 @@ parameters as (SELECT date_trunc('month', date ('2023-02-01')) as input_month)
 , fmc_table as (
 SELECT
     *
-FROM "db_stage_dev"."lcpr_fmc_table_dec_mar23" --- Make sure to set the month accordindly to the input month of parameters
+FROM "db_stage_dev"."lcpr_fmc_table_dec_mar23" 
 UNION ALL (SELECT * FROM "db_stage_dev"."lcpr_fmc_table_jan_mar23")
 UNION ALL (SELECT * FROM "db_stage_dev"."lcpr_fmc_table_feb_mar23")
--- WHERE 
---     fmc_s_dim_month = (SELECT input_month FROM parameters)
 )
 
 , repeated_accounts as (
 SELECT 
     fmc_s_dim_month, 
-    fix_s_att_account, --- Operational Drivers are focused just in Fixed dynamics, not Mobile. I don't take the FMC account because sometimes in concatenates Fixed and Mobile accounts ids, which alters the results when joining with other bases using the account id.
+    fix_s_att_account,
     count(*) as records_per_user
 FROM fmc_table
 WHERE 
-    fix_s_att_account is not null --- Making sure that we are focusing just in Fixed.
-    and fix_e_att_active = 1 --- The denominator of most of the Sprint 5 is the active base.
+    fix_s_att_account is not null
+    and fix_e_att_active = 1
 GROUP BY 1, 2
 ORDER BY 3 desc
 )
@@ -39,7 +37,7 @@ FROM fmc_table F
 LEFT JOIN repeated_accounts R
     ON F.fix_s_att_account = R.fix_s_att_account and F.fmc_s_dim_month = R.fmc_s_dim_month
 )
--- SELECT * FROM fmc_table_adj LIMIT 100
+
 --- --- --- Interactions
 , clean_interaction_time as (
 SELECT *
@@ -84,7 +82,7 @@ FROM "lcpr.stage.dev"."truckrolls"
 )
 
 
---- ### ### ### Repeated callers
+--- ### ### ### ### ### REPEATED CALLERS ### ### ### ### ###
 
 , interactions_count as (
 SELECT
@@ -110,7 +108,7 @@ FROM interactions_count
 )
 
 
---- ### ### ### Reiterative tickets
+--- ### ### ### ### ### REITERATIVE TICKETS ### ### ### ### ###
 
 , users_tickets_pre as (
 SELECT
@@ -295,7 +293,7 @@ FROM tickets_count
 )
 
 
---- ### ### ### Tickets per month
+--- ### ### ### ### ### TTICKETS PER MONTH ### ### ### ### ###
 
 , tickets_per_month as (
 SELECT
@@ -316,11 +314,11 @@ WHERE
 GROUP BY 1, 2
 )
 
---- ### ### ### Nodes ticket density
+--- ### ### ### ### ### NODES TICKET DENSITY ### ### ### ### ###
 
---- On due!
+--- It's in another script to match with the CX Table Structure
 
---- ### ### ### Joining all flags
+--- ### ### ### ### ### JOINING ALL FLAGS ### ### ### ### ###
 
 , flag1_repeated_callers as(
 SELECT 
@@ -354,7 +352,7 @@ LEFT JOIN tickets_per_month I
 )
 
 
---- ### ### ### Final table
+--- ### ### ### ### ### FINAL TABLE ### ### ### ### ###
 
 --- --- --- Jamaica's structure
 , sprint5_full_table_LikeJam as (
