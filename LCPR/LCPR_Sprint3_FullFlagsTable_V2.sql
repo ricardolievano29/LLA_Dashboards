@@ -123,11 +123,49 @@ FROM "lcpr.stage.dev"."truckrolls"
 
 --- ### ### ### Straight to Soft Dx
 
---- Skipped for now. It is in no use for Panama.
+--- Num: Customers who achieve 50 days overdue associated to a certain sale month
+--- Denom: Month new sales
+
+--- Skipped for now. It is not being used in Panama.
+
+--- This KPI takes the new customers of 2 months ago and determines how many of them achieved a 50 days overdue. Thus, the corresponding cohort is m-2.
+
+--- Here we take the customers connected 2 months ago and flag those that achieved a 50 days overdue. As the DNA has daily records for each user, flagging when the overdue equals 50 days is enough.
+, soft_dx as (
+SELECT
+    distinct fix_s_att_account,
+    --- I'm using max functions to optimise this code. Anyways, the result is the same because at the end I'm matching each user to the info of his "last" conection as new customer.
+    max(install_month) as install_month,
+    max(new_sales_flag) as new_sales2m_flag,
+    max(case when delinquency_days = 50 then fix_s_att_account else null end) as soft_dx_flag
+FROM new_customers3m_now
+WHERE 
+    date_trunc('month', date(fix_b_att_maxstart)) = (SELECT input_month FROM parameters) - interval '2' month
+GROUP BY 1
+)
 
 --- ### ### ### Never Paid
 
---- The 85-day moving window is not completed yet.
+--- Num: Customers who achieve 85 days overdue associated to a certain sale month
+--- Denom: Month new sales
+
+--- The 85-day moving window is not completed yet (30/3/2033).
+
+--- This KPI uses the sales of three months ago and checks how many of those new customers achieved a 85-days overdue. Therefore, the cohort is m-3.
+
+--- We take the clients connected 3 months ago and flag those who achieved an overdue of 85 days in the following months
+, never_paid as (
+SELECT 
+    install_month, 
+    fix_b_att_maxstart,
+    fix_s_att_account, 
+    new_sales_flag as new_sales3m_flag,
+    delinquency_days, 
+    case when delinquency_days = 85 then fix_s_att_account else null end as never_paid_85_flag
+FROM new_customers3m_now
+WHERE
+    date_trunc('month', date(fix_b_att_maxstart)) = (SELECT input_month FROM parameters) - interval '3' month
+)
 
 --- ### ### ### Early Tickets
 
@@ -365,23 +403,43 @@ LEFT JOIN usefulfields b
 
 --- ### ### ### Joining all the flags
 
-, flag3_early_tickets as (
+, flag1_soft_dx as (
 SELECT
     F.*, 
-    early_ticket_flag, 
-    new_sales2m_flag
+    new_sales2m_flag, --- Used in other KPIs as well
+    soft_dx_flag
 FROM fmc_table_adj F
-LEFT JOIN early_tickets I
+LEFT JOIN soft_dx I
     ON cast(F.fix_s_att_account as varchar) = cast(I.fix_s_att_account as varchar) and date(F.fmc_s_dim_month) = date(I.install_month + interval '2' month)
 WHERE
     F.fmc_s_dim_month = (SELECT input_month FROM parameters)
     and F.fix_e_att_active = 1 
 )
 
+, flag2_never_paid as (
+SELECT
+    F.*, 
+    new_sales3m_flag, 
+    never_paid_85_flag
+FROM flag1_soft_dx F 
+LEFT JOIN never_paid I
+    ON cast(F.fix_s_att_account as varchar) = cast(I.fix_s_att_account as varchar) and date(F.fmc_s_dim_month) = date(I.install_month + interval '3' month)
+    
+)
+
+, flag3_early_tickets as (
+SELECT
+    F.*, 
+    early_ticket_flag
+FROM flag2_never_paid F
+LEFT JOIN early_tickets I
+    ON cast(F.fix_s_att_account as varchar) = cast(I.fix_s_att_account as varchar) and date(F.fmc_s_dim_month) = date(I.install_month + interval '2' month)
+)
+
 , flag4_outlier_installs as (
 SELECT
     F.*, 
-    new_sales_flag, 
+    new_sales_flag, --- Used in other KPIs as well
     outlier_install_flag
 FROM flag3_early_tickets F
 LEFT JOIN outlier_installs I
@@ -420,33 +478,21 @@ LEFT JOIN mounting_bills I
 , final_table as (
 SELECT 
     fmc_s_dim_month as opd_s_dim_month,
-    fmc_e_fla_tech as odr_e_fla_final_tech, -- E_Final_Tech_Flag, 
-    fmc_e_fla_fmcsegment as odr_e_fla_fmc_segment, -- E_FMC_Segment, 
-    fmc_e_fla_fmc as odr_e_fla_fmc_type, -- E_FMCType, 
+    fmc_e_fla_tech as odr_e_fla_final_tech,
+    fmc_e_fla_fmcsegment as odr_e_fla_fmc_segment,
+    fmc_e_fla_fmc as odr_e_fla_fmc_type,
     case 
         when fmc_e_fla_tenure = 'Early Tenure' then 'Early-Tenure'
         when fmc_e_fla_tenure = 'Mid Tenure' then 'Mid-Tenure'
         when fmc_e_fla_tenure = 'Late Tenure' then 'Late-Tenure'
-    end as odr_e_fla_final_tenure, ---E_FinalTenureSegment,
-    count(distinct fix_s_att_account) as odr_s_mes_active_base, -- as activebase, 
-    -- sales_channel, 
-    count(distinct new_sales_flag) as opd_s_mes_sales, -- sum(monthsale_flag) as Sales, 
+    end as odr_e_fla_final_tenure,
+    count(distinct fix_s_att_account) as odr_s_mes_active_base,
+    count(distinct new_sales_flag) as opd_s_mes_sales,
     count(distinct new_sales2m_flag) as opd_s_mes_sales2m,
-    -- count(distinct new_sales2m_flag) as opd_s_mes_sales3m,
-    -- sum(SoftDx_Flag) as Soft_Dx, 
-    -- sum (NeverPaid_Flag) as NeverPaid,
+    count(distinct new_sales3m_flag) as opd_s_mes_sales3m,
     count(distinct outlier_install_flag) as opd_s_mes_long_installs, 
-    -- sum (increase_flag) as MRC_Increases, 
-    -- sum (no_plan_change_flag) as NoPlan_Changes, 
-    -- sum(mountingbill_flag) as MountingBills, 
-    -- sum(earlyticket_flag) as EarlyTickets,
-    -- Sales_Month, 
-    -- Install_Month, 
-    -- Ticket_Month, 
-    -- count(distinct F_SalesFlag) Unique_Sales, 
-    -- count(distinct soft_dx_flag) as opd_s_mes_uni_softdx,
-    -- count(distinct day_85) as opd_s_mes_uni_never_paid,
-    -- count(distinct F_LongInstallFlag) Unique_LongInstall,
+    count(distinct soft_dx_flag) as opd_s_mes_uni_softdx,
+    count(distinct never_paid_85_flag) as opd_s_mes_uni_never_paid,
     count(distinct mrc_increase_flag) as opd_s_mes_uni_mrcincrease,
     count(distinct no_plan_change) as opd_s_mes_uni_noplan_changes,
     count(distinct mounting_bill_flag) as opd_s_mes_uni_moun_gbills, 
@@ -462,5 +508,3 @@ ORDER BY 1, 2, 3, 4, 5
 )
 
 SELECT * FROM final_table
-
--- SELECT sum(opd_s_mes_uni_moun_gbills), sum(odr_s_mes_active_base) FROM final_table
