@@ -47,7 +47,7 @@ FROM "lcpr.stage.prod"."lcpr_interactions_csg"
 WHERE
     (cast(interaction_start_time as varchar) != ' ') 
     and (interaction_start_time is not null)
-    and date_trunc('month', cast(substr(cast(interaction_start_time as varchar),1,10) as date)) between ((SELECT input_month FROM parameters)) and ((SELECT input_month FROM parameters) + interval '1' month - interval '1' day)
+    and date_trunc('month', date(interaction_start_time)) between (SELECT input_month FROM parameters) - interval '2' month and (SELECT input_month FROM parameters)
     and account_type = 'RES'
 )
 
@@ -376,7 +376,6 @@ SELECT
     count(distinct case when ticket_tier in ('2', '>3') then fix_s_att_account else null end) as odr_s_mes_over1_ticket, -- as over1_ticket, 
     count(distinct case when ticket_tier = '2' then fix_s_att_account else null end) as odr_s_mes_two_tickets, -- as two_tickets, 
     count(distinct case when ticket_tier = '>3' then fix_s_att_account else null end) as odr_s_mes_three_more_tickets, -- as three_more_tickets,
-    -- count (distinct techticket) as ticket_customers,
     sum(number_tickets) as odr_s_mes_total_tickets 
     -- count(distinct outlier_repair) as outlier_repairs 
 FROM flag3_tickets_per_month
@@ -388,55 +387,6 @@ GROUP BY 1, 2, 3, 4, 5, 6, 7
 ORDER BY 1, 2, 3, 4, 5, 6
 )
 
-
---- --- --- Panama´s structure
--- , sprint5_full_table_LikePan as (
--- SELECT  
---     fmc_s_dim_month as odr_s_dim_month,
---     fmc_b_fla_tech as odr_b_fla_final_tech, -- B_Final_TechFlag, 
---     fmc_b_fla_fmcsegment as odr_b_fla_fmc_segment, -- B_FMCSegment, 
---     fmc_b_fla_fmc as odr_b_fla_fmc_type, -- B_FMCType, 
---     fmc_e_fla_tech as odr_e_fla_final_tech, -- E_Final_TechFlag, 
---     fmc_e_fla_fmcsegment as odr_e_fla_fmc_segment, -- E_FMCSegment, 
---     fmc_e_fla_fmc as odr_e_fla_fmc_type, -- E_FMCType, 
-    -- case 
-    --     when fmc_b_fla_tenure = 'Early Tenure' then 'Early-Tenure'
-    --     when fmc_b_fla_tenure = 'Mid Tenure' then 'Mid-Tenure'
-    --     when fmc_b_fla_tenure = 'Late Tenure' then 'Late-Tenure'
-    -- end as odr_b_fla_final_tenure, , -- b_final_tenure, 
-    -- case 
-    --     when fmc_e_fla_tenure = 'Early Tenure' then 'Early-Tenure'
-    --     when fmc_e_fla_tenure = 'Mid Tenure' then 'Mid-Tenure'
-    --     when fmc_e_fla_tenure = 'Late Tenure' then 'Late-Tenure'
-    -- end as odr_e_fla_final_tenure, -- e_final_tenure, 
-    -- case 
-    --     when fix_b_fla_tenure = 'Early Tenure' then 'Early-Tenure'
-    --     when fix_b_fla_tenure = 'Mid Tenure' then 'Mid-Tenure'
-    --     when fix_b_fla_tenure = 'Late Tenure' then 'Late-Tenure'
-    -- end as odr_b_fla_tenure, -- B_FixedTenure, 
-    -- case 
-    --     when fix_e_fla_tenure = 'Early Tenure' then 'Early-Tenure'
-    --     when fix_e_fla_tenure = 'Mid Tenure' then 'Mid-Tenure'
-    --     when fix_e_fla_tenure = 'Late Tenure' then 'Late-Tenure'
-    -- end as odr_e_fla_tenure, -- E_FixedTenure, 
---     interaction_tier as odr_s_fla_interaction_tier, 
---     ticket_tier as odr_s_fla_tickets_tier, 
---     fmc_s_fla_churnflag as odr_s_fla_final_churn, -- finalchurnflag, 
---     fix_s_fla_churnflag as odr_s_fla_churn, -- fixedchurnflag, 
---     fmc_s_fla_waterfall as odr_s_fla_waterfall, -- waterfall_flag, 
---     count(distinct fix_s_att_account) as odr_s_mes_active_base, 
---     -- count(DISTINCT fixedaccount) AS Fixed_Accounts,
---     count(distinct interactions) as odr_s_mes_user_interactions, 
---     -- count(DISTINCT tickets) AS Userstickets, 
---     sum(number_tickets) as odr_s_mes_total_tickets
---     -- count(DISTINCT outlier_repair) AS outlier_repairs, 
---     -- count(DISTINCT users_truckrolls) AS users_truckrolls, 
---     -- count(DISTINCT missed_visits) AS missed_visits
--- FROM flag3_tickets_per_month
--- WHERE ((fmc_s_fla_churntype != 'Fixed Voluntary Churner' and fmc_s_fla_churntype != 'Fixed Involuntary Churner') or fmc_s_fla_churntype IS NULL) 
---     and fmc_s_fla_churnflag !='Fixed Churner'
--- GROUP BY 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16
--- )
 
 --- --- ---
 SELECT * FROM sprint5_full_table_LikeJam
