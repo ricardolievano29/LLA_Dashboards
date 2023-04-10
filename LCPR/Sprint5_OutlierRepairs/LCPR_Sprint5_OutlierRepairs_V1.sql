@@ -61,9 +61,8 @@ SELECT
 FROM truckrolls
 WHERE 
     job_typ_ojb != 'MN'
-    and date(create_dte_ojb) = (SELECT input_month FROM parameters)
-    and comp_dte not in ('NO CONTACT CUST', 'NULL', 'D47', '80 CALLE DIAMANTE')
-    and comp_dte is not null
+    and date_trunc('month', date(create_dte_ojb)) = (SELECT input_month FROM parameters)
+    and comp_dte like '%-%-%'
     and job_stat_ojb = 'C'
 )
 
@@ -132,11 +131,11 @@ GROUP BY 1, 2, 3, 4, 5
 ORDER BY 1, 2, 3, 4, 5
 )
 
-SELECT * FROM final_table
+-- SELECT * FROM final_table
 
 --- ### Specific numbers
 
--- SELECT
---     sum(odr_s_mes_outlier_repairs),
---     sum(odr_s_mes_active_base)
--- FROM final_table
+SELECT
+    sum(odr_s_mes_outlier_repairs),
+    sum(odr_s_mes_active_base)
+FROM final_table
