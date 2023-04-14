@@ -218,6 +218,10 @@ SELECT  F.*
 FROM fmc_table F LEFT JOIN final A ON F.fixed_account = A.act_acct_cd AND F.month = A.month
 )
 
+
 SELECT 
-    count(distinct act_acct_cd)
-FROM final
+    fixed_account, 
+    act_acct_cd,
+    case when (fixed_account is null and act_acct_cd is not null) then act_acct_cd else null end as missing_sales
+FROM fmc_table F FULL OUTER JOIN final A ON F.fixed_account = A.act_acct_cd AND F.month = A.month
+ORDER BY missing_sales desc
