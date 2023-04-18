@@ -4,7 +4,7 @@
 WITH
   
  parameters as (
- SELECT date_trunc('month', date('2023-02-01')) as input_month --- Input month you wish the code run for
+ SELECT date_trunc('month', date('2023-03-01')) as input_month --- Input month you wish the code run for
  )
  
 , fmc_table as (
@@ -162,11 +162,11 @@ GROUP BY 1, 2, 3, 4, 5
 ORDER BY 1, 2, 3, 4, 5
 )
 
-SELECT * FROM missed_visits
+SELECT * FROM final_table
 
 -- --- ### Specific numbers
 
 -- SELECT
---     sum(odr_s_mes_missed_visits),
---     sum(odr_s_mes_active_base)
+    -- sum(odr_s_mes_missed_visits),
+    -- sum(odr_s_mes_active_base)
 -- FROM final_table
