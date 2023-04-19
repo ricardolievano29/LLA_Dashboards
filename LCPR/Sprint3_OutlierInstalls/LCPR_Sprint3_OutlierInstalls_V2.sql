@@ -1,5 +1,6 @@
---- ##### LCPR SPRINT 3 - OPERATIONAL DRIVERS - OUTLIER INSTALLS #####
-
+--- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- ---
+--- --- --- --- ##### LCPR - SPRINT 3 - OPERATIONAL DRIVERS - OUTLIER INSTALLS ##### --- --- --- ---
+--- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- ---
 WITH
 
 parameters as (
@@ -135,7 +136,7 @@ GROUP BY 1, 2, 3, 4, 5
 ORDER BY 1, 2, 3, 4, 5
 )
 
--- SELECT * FROM final_table
+SELECT * FROM final_table
 
 --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- ---
 --- --- --- --- --- --- --- --- --- --- --- Tests --- --- --- --- --- --- --- --- --- --- ---
@@ -143,8 +144,8 @@ ORDER BY 1, 2, 3, 4, 5
 
 --- ### Outlier installs ###
 
-SELECT
-    sum(opd_s_mes_long_installs) as outlier_installs, 
-    sum(opd_s_mes_sales) as sales_base, 
-    cast(sum(opd_s_mes_long_installs) as double)/cast(sum(opd_s_mes_sales) as double) as KPI
-FROM final_table
+-- SELECT
+--     sum(opd_s_mes_long_installs) as outlier_installs, 
+--     sum(opd_s_mes_sales) as sales_base, 
+--     cast(sum(opd_s_mes_long_installs) as double)/cast(sum(opd_s_mes_sales) as double) as KPI
+-- FROM final_table
