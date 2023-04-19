@@ -1,19 +1,46 @@
---- ##### LCPR SPRINT 3 - OPERATIONAL DRIVERS - BILLING CLAIMS #####
+--- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- ---
+--- --- --- --- ##### LCPR - SPRINT 3 - OPERATIONAL DRIVERS - BILLING CLAIMS ##### --- --- --- ---
+--- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- ---
+WITH
 
-with 
+parameters as (select date('2023-03-01') as input_month)
 
-parameters as (select date('2022-12-01') as input_month)
+--- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- ---
+--- --- --- --- --- --- --- --- --- --- --- FMC Table --- --- --- --- --- --- --- --- --- --- ---
+--- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- ---
 
 , fmc_table as (
-SELECT 
-    date_trunc('month', date(dt)) as fix_s_dim_month,  
-    SUB_ACCT_NO_SBB as fix_s_att_account 
-FROM "lcpr.stage.prod"."insights_customer_services_rates_lcpr" 
+SELECT
+    *
+FROM "lla_cco_lcpr_ana_prod"."lcpr_fmc_churn_dev"
 WHERE 
-    play_type <> '0P'
-    and cust_typ_sbb = 'RES' 
-    and date_trunc('month', date(dt)) = (SELECT input_month FROM parameters)
+    fmc_s_dim_month = (SELECT input_month FROM parameters)
 )
+
+, repeated_accounts as (
+SELECT 
+    fmc_s_dim_month, 
+    fix_s_att_account,
+    count(*) as records_per_user
+FROM fmc_table
+WHERE 
+    fix_s_att_account is not null
+GROUP BY 1, 2
+ORDER BY 3 desc
+)
+
+, fmc_table_adj as (
+SELECT 
+    F.*,
+    records_per_user
+FROM fmc_table F
+LEFT JOIN repeated_accounts R
+    ON F.fix_s_att_account = R.fix_s_att_account and F.fmc_s_dim_month = R.fmc_s_dim_month
+)
+
+--- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- ---
+--- --- --- --- --- --- --- --- --- --- --- BILLING CLAIMS --- --- --- --- --- --- --- --- --- --- ---
+--- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- ---
 
 , pre_bill_claim as (
 SELECT 
@@ -32,18 +59,60 @@ WHERE
 )
 
 , bill_claim as (
-SELECT * 
+SELECT 
+    *, 
+    customer_id as bill_claim_flag
 FROM pre_bill_claim
 WHERE 
-    interaction_purpose_descrip not in  ('Ci: Cable Card Req', 'Ci: Inst/Tc Status', 'Ci: Install Stat', 'Ci: Installer / Tech')
+    interaction_purpose_descrip not in ('Ci: Cable Card Req', 'Ci: Inst/Tc Status', 'Ci: Install Stat', 'Ci: Installer / Tech')
 )
 
+--- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- ---
+--- --- --- --- --- --- --- --- --- --- --- Final flag --- --- --- --- --- --- --- --- --- --- ---
+--- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- ---
+
+, flag_outlier_installs as (
+SELECT
+    F.*, 
+    bill_claim_flag
+FROM fmc_table_adj F
+LEFT JOIN bill_claim I
+    ON cast(F.fix_s_att_account as varchar) = cast(I.customer_id as varchar) and F.fmc_s_dim_month = I.interaction_start_month
+WHERE
+    fmc_s_dim_month = (SELECT input_month FROM parameters)
+    and fix_e_att_active = 1 
+)
+
+, final_table as (
 SELECT 
-    fix_s_dim_month as opd_s_dim_month, 
-    count(distinct customer_id) as opd_s_mes_uni_bill_claim, 
-    count(distinct fix_s_att_account) as opd_s_mes_active_base
-FROM fmc_table 
-LEFT JOIN bill_claim 
-    ON cast(fix_s_att_account as varchar) = customer_id and fix_s_dim_month = interaction_start_month 
-GROUP BY 1
-ORDER BY 1
+    fmc_s_dim_month as opd_s_dim_month,
+    fmc_e_fla_tech as odr_e_fla_final_tech,
+    fmc_e_fla_fmcsegment as odr_e_fla_fmc_segment,
+    fmc_e_fla_fmc as odr_e_fla_fmc_type,
+    case --- Making sure the tenures fit with the dashboard ones
+        when fmc_e_fla_tenure = 'Early Tenure' then 'Early-Tenure'
+        when fmc_e_fla_tenure = 'Mid Tenure' then 'Mid-Tenure'
+        when fmc_e_fla_tenure = 'Late Tenure' then 'Late-Tenure'
+    end as odr_e_fla_final_tenure, ---E_FinalTenureSegment,
+    count(distinct fix_s_att_account) as odr_s_mes_active_base, 
+    count(distinct bill_claim_flag) as opd_s_mes_uni_bill_claim
+FROM flag_outlier_installs
+WHERE 
+    fmc_s_fla_churnflag != 'Fixed Churner' 
+    and fmc_s_fla_waterfall not in ('Downsell-Fixed Customer Gap', 'Fixed Base Exception', 'Churn Exception') 
+    and fix_s_fla_mainmovement != '6.Null last day'
+GROUP BY 1, 2, 3, 4, 5
+ORDER BY 1, 2, 3, 4, 5
+)
+
+SELECT * FROM final_table
+
+--- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- ---
+--- --- --- --- --- --- --- --- --- --- --- Tests --- --- --- --- --- --- --- --- --- --- ---
+--- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- ---
+
+-- SELECT 
+--     sum(opd_s_mes_uni_bill_claim) as bill_claims, 
+--     sum(odr_s_mes_active_base) as active_base, 
+--     cast(sum(opd_s_mes_uni_bill_claim) as double)/cast(sum(odr_s_mes_active_base) as double) as KPI 
+-- FROM final_table
