@@ -4,7 +4,7 @@
 WITH
 
 parameters as (
-SELECT date_trunc('month', date('2023-01-01')) as input_month
+SELECT date_trunc('month', date('2023-02-01')) as input_month
 )
 
 --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- ---
@@ -166,7 +166,7 @@ LEFT JOIN repeated_accounts R
 --- --- --- --- --- --- --- --- --- --- --- New customers --- --- --- --- --- --- --- --- --- --- ---
 --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- ---
 
-, new_customers2m_pre as (
+, new_customers_pre as (
 SELECT
     cast(cast(first_value(connect_dte_sbb) over (partition by sub_acct_no_sbb order by DATE(dt) DESC) as timestamp) as date) as fix_b_att_maxstart,   
     SUB_ACCT_NO_SBB as fix_s_att_account 
@@ -174,7 +174,7 @@ FROM "lcpr.stage.prod"."insights_customer_services_rates_lcpr"
 WHERE 
     play_type != '0P'
     and cust_typ_sbb = 'RES' 
-    and date_trunc('month', date(CONNECT_DTE_SBB)) = (SELECT input_month FROM parameters) - interval '2' month
+    and date_trunc('month', date(CONNECT_DTE_SBB)) between ((SELECT input_month FROM parameters) - interval '2' month) and (SELECT input_month FROM parameters))
 ORDER BY 1
 )
     
@@ -184,21 +184,10 @@ SELECT
     fix_b_att_maxstart,  
     fix_s_att_account as new_sales2m_flag,
     fix_s_att_account
-FROM new_customers2m_pre
+FROM new_customers_pre
+WHERE date_trunc('month', date(CONNECT_DTE_SBB)) = ((SELECT input_month FROM parameters) - interval '2' month)
 )
 
-, new_customers_pre as (
-SELECT
-    cast(cast(first_value(connect_dte_sbb) over (partition by sub_acct_no_sbb order by DATE(dt) DESC) as timestamp) as date) as fix_b_att_maxstart,   
-    SUB_ACCT_NO_SBB as fix_s_att_account 
-FROM "lcpr.stage.prod"."insights_customer_services_rates_lcpr" 
-WHERE 
-    play_type != '0P'
-    and cust_typ_sbb = 'RES' 
-    and date_trunc('month', date(CONNECT_DTE_SBB)) = (SELECT input_month FROM parameters)
-ORDER BY 1
-)
-    
 , new_customers as (   
 SELECT 
     date_trunc('month', fix_b_att_maxstart) as install_month, 
@@ -206,12 +195,14 @@ SELECT
     fix_s_att_account as new_sales_flag,
     fix_s_att_account
 FROM new_customers_pre
+WHERE date_trunc('month', date(CONNECT_DTE_SBB)) = (SELECT input_month FROM parameters)
 )
 
 , relevant_base as (
 SELECT
     a.install_month,
     a.fix_s_att_account,
+    a.fix_b_att_maxstart,
     a.new_sales_flag,
     b.new_sales2m_flag as customers_2m_cohort
 FROM new_customers a
@@ -223,39 +214,56 @@ FULL OUTER JOIN new_customers2m b
 --- --- --- --- --- --- --- --- --- --- --- Early tickets --- --- --- --- --- --- --- --- --- --- ---
 --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- ---
 
-, relevant_interactions as ( -----------------------------------
+, relevant_interactions as (
 SELECT
     customer_id, 
+    interaction_id, 
+    job_no_ojb,
+    interaction_type,
     min(interaction_date) as min_interaction_date, 
     min(date_trunc('month', date(interaction_date))) as interaction_start_month 
 FROM full_interactions
+GROUP BY 1, 2, 3, 4
+WHERE customer_id in (SELECT customers_2m_cohort FROM relevant_base)
 )
 
-, new_customer_interactions AS (
+, early_tickets AS (
 SELECT 
-    fix_s_att_account, 
+    A.fix_s_att_account, 
     new_sales2m_flag,
     install_month, 
     interaction_start_month, 
     fix_b_att_maxstart,
-    case when date_diff('week', date(fix_b_att_maxstart), date(min_interaction_date)) <= 7 then fix_s_att_account else null end as early_ticket_flag
+    case when date_diff('week', date(fix_b_att_maxstart), date(min_interaction_date)) <= 7 then customers_2m_cohort else null end as early_ticket_flag
 FROM new_customers2m A 
 LEFT JOIN relevant_interactions B 
-    ON A.fix_s_att_account = cast(B.customer_id as bigint)
+    ON cast(A.fix_s_att_account as varchar) = cast(B.customer_id as varchar)
 WHERE interaction_type in ('tech_call', 'truckroll')
+)
+
+--- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- ---
+--- --- --- --- --- --- --- --- --- --- --- Final flags --- --- --- --- --- --- --- --- --- --- ---
+--- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- ---
+
+, flag_new_customers as (
+SELECT
+    F.*, 
+    new_sales_flag
+FROM fmc_table_adj F
+LEFT JOIN new_customers I
+    ON cast(F.fix_s_att_account as varchar) = cast(I.fix_s_att_account as varchar)
+WHERE
+    fmc_s_dim_month = (SELECT input_month FROM parameters)
+    and fix_e_att_active = 1
 )
 
 , flag_early_tickets as (
 SELECT
     F.*, 
-    new_sales2m_flag, 
     early_ticket_flag
-FROM fmc_table_adj F
-LEFT JOIN new_customer_interactions I
+FROM flag_new_customers F
+LEFT JOIN early_tickets I
     ON cast(F.fix_s_att_account as varchar) = cast(I.fix_s_att_account as varchar)
-WHERE
-    fmc_s_dim_month = (SELECT input_month FROM parameters)
-    and fix_e_att_active = 1 
 )
 
 
@@ -271,7 +279,7 @@ SELECT
         when fmc_e_fla_tenure = 'Late Tenure' then 'Late-Tenure'
     end as odr_e_fla_final_tenure,
     count(distinct fix_s_att_account) as odr_s_mes_active_base,
-    count(distinct new_sales2m_flag) as opd_s_mes_sales,
+    count(distinct new_sales_flag) as opd_s_mes_sales,
     count(distinct early_ticket_flag) as EarlyTickets
 FROM flag_early_tickets
 WHERE 
@@ -282,4 +290,14 @@ GROUP BY 1, 2, 3, 4, 5
 ORDER BY 1, 2, 3, 4, 5
 )
 
-SELECT count(distinct customers_2m_cohort) FROM relevant_base
+SELECT * FROM final_table
+
+--- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- ---
+--- --- --- --- --- --- --- --- --- --- --- Tests --- --- --- --- --- --- --- --- --- --- ---
+--- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- ---
+
+-- SELECT 
+--     sum(EarlyTickets) as early_tickets, 
+--     sum(opd_s_mes_sales) as sales_base, 
+--     cast(sum(EarlyTickets) as double)/cast(sum(sales_base) as double) as KPI
+-- FROM final_table
