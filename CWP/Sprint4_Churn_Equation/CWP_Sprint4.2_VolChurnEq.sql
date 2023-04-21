@@ -8,8 +8,8 @@ WITH FMC_Table AS
 ,case when e_vo is not null then 1 else 0 end as vo_eom
 FROM "lla_cco_int_ana_dev"."cwp_fmc_churn_dev"
 where 
-    month=date(dt) 
-    -- month=date('2023-03-01') 
+    -- month=date(dt) 
+    month=date('2023-01-01')
     and f_activebom=1
 )
 
@@ -114,11 +114,23 @@ order by 1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25
 -- select * from FinalVolChurnTable order by 1 desc 
 
 SELECT
-    sum(all_attempts) as all_attempts, 
-    sum(rcoe_attempts) as rcoe_attempts, 
-    sum(all_real_dx) as all_real_dx, 
-    sum(rcoe_real_dx) as rcoe_real_dx, 
-    sum(Other_Vol_Dx) as other_vol_dx, 
-    sum(BajasNoCursadas) as Bajas_No_Cursadas, 
-    sum(ret_users) as retained_users
-FROM FinalVolChurnTable
+    sum(case when dx_attempt is not null then b_numrgus else null end) as total_intents_rgus, 
+    sum(case when Dx_Attempt_RCOE is not null then b_numrgus else null end) as total_cc_intents_rgus, 
+    sum(case when retained is not null then b_numrgus else null end) as retained_rgus, 
+    sum(case when all_real_dx is not null then b_numrgus else null end) as created_orders, 
+    sum(case when rcoe_real_dx is not null then b_numrgus else null end) as completed_orders, 
+    sum(case when BajasNoCursadas is not null then b_numrgus else null end) as non_completed_orders, 
+    sum(case when Other_vol_dx is not null then b_numrgus else null end) as churn_others,
+    -- sum(case when all_real_dx is not null then b_numrgus else null end) as created, 
+    sum(case when waterfall_flag = 'Voluntary Churners' then b_numrgus else null end) as voluntary
+FROM final_flags
+
+-- SELECT
+--     -- distinct FixedChurnType, 
+--     -- distinct finalchurnflag,, 
+--     distinct waterfall_flag,
+--     count(distinct finalaccount)
+    -- *
+-- FROM final_flags
+-- GROUP BY 1
+-- LIMIT 10
