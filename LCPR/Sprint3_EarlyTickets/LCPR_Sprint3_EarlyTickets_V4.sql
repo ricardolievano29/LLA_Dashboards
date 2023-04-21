@@ -174,7 +174,7 @@ FROM "lcpr.stage.prod"."insights_customer_services_rates_lcpr"
 WHERE 
     play_type != '0P'
     and cust_typ_sbb = 'RES' 
-    and date_trunc('month', date(CONNECT_DTE_SBB)) between ((SELECT input_month FROM parameters) - interval '2' month) and (SELECT input_month FROM parameters))
+    and date_trunc('month', date(CONNECT_DTE_SBB)) between ((SELECT input_month FROM parameters) - interval '2' month) and (SELECT input_month FROM parameters)
 ORDER BY 1
 )
     
@@ -185,7 +185,7 @@ SELECT
     fix_s_att_account as new_sales2m_flag,
     fix_s_att_account
 FROM new_customers_pre
-WHERE date_trunc('month', date(CONNECT_DTE_SBB)) = ((SELECT input_month FROM parameters) - interval '2' month)
+WHERE date_trunc('month', date(fix_b_att_maxstart)) = ((SELECT input_month FROM parameters) - interval '2' month)
 )
 
 , new_customers as (   
@@ -195,7 +195,7 @@ SELECT
     fix_s_att_account as new_sales_flag,
     fix_s_att_account
 FROM new_customers_pre
-WHERE date_trunc('month', date(CONNECT_DTE_SBB)) = (SELECT input_month FROM parameters)
+WHERE date_trunc('month', date(fix_b_att_maxstart)) = (SELECT input_month FROM parameters)
 )
 
 , relevant_base as (
@@ -224,7 +224,6 @@ SELECT
     min(date_trunc('month', date(interaction_date))) as interaction_start_month 
 FROM full_interactions
 GROUP BY 1, 2, 3, 4
-WHERE customer_id in (SELECT customers_2m_cohort FROM relevant_base)
 )
 
 , early_tickets AS (
@@ -234,7 +233,7 @@ SELECT
     install_month, 
     interaction_start_month, 
     fix_b_att_maxstart,
-    case when date_diff('week', date(fix_b_att_maxstart), date(min_interaction_date)) <= 7 then customers_2m_cohort else null end as early_ticket_flag
+    case when date_diff('week', date(fix_b_att_maxstart), date(min_interaction_date)) <= 7 then fix_s_att_account else null end as early_ticket_flag
 FROM new_customers2m A 
 LEFT JOIN relevant_interactions B 
     ON cast(A.fix_s_att_account as varchar) = cast(B.customer_id as varchar)
@@ -290,14 +289,14 @@ GROUP BY 1, 2, 3, 4, 5
 ORDER BY 1, 2, 3, 4, 5
 )
 
-SELECT * FROM final_table
+-- SELECT * FROM final_table
 
 --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- ---
 --- --- --- --- --- --- --- --- --- --- --- Tests --- --- --- --- --- --- --- --- --- --- ---
 --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- ---
 
--- SELECT 
---     sum(EarlyTickets) as early_tickets, 
---     sum(opd_s_mes_sales) as sales_base, 
---     cast(sum(EarlyTickets) as double)/cast(sum(sales_base) as double) as KPI
--- FROM final_table
+SELECT 
+    sum(EarlyTickets) as early_tickets, 
+    sum(opd_s_mes_sales) as sales_base, 
+    cast(sum(EarlyTickets) as double)/cast(sum(opd_s_mes_sales) as double) as KPI
+FROM final_table
