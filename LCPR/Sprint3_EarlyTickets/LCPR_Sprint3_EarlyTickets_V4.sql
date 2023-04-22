@@ -198,18 +198,6 @@ FROM new_customers_pre
 WHERE date_trunc('month', date(fix_b_att_maxstart)) = (SELECT input_month FROM parameters)
 )
 
-, relevant_base as (
-SELECT
-    a.install_month,
-    a.fix_s_att_account,
-    a.fix_b_att_maxstart,
-    a.new_sales_flag,
-    b.new_sales2m_flag as customers_2m_cohort
-FROM new_customers a
-FULL OUTER JOIN new_customers2m b
-    ON a.fix_s_att_account = b.fix_s_att_account
-)
-
 --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- ---
 --- --- --- --- --- --- --- --- --- --- --- Early tickets --- --- --- --- --- --- --- --- --- --- ---
 --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- ---
