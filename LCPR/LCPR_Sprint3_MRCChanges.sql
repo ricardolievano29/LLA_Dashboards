@@ -66,7 +66,7 @@ LEFT JOIN eom_current_month c
 --- --- --- --- --- --- --- --- --- --- --- Final flag --- --- --- --- --- --- --- --- --- --- ---
 --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- ---
 
-, flag_outlier_installs as (
+, flag_mrc_changes as (
 SELECT
     F.*
 FROM mrc_changes F
