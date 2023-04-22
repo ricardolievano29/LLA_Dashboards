@@ -150,21 +150,6 @@ WHERE
 GROUP BY account_id
 )
 
---- --- No sales channel calculation implemented (yet)
-
--- ,summary_by_user AS (
--- SELECT *
--- FROM (
---     select * , DATE_DIFF('DAY',first_bill_created, first_payment_above_20_date) AS days_between_payment
---             ,CASE   WHEN first_payment_above_20_date IS NULL THEN 91
---                     ELSE DATE_DIFF('DAY',first_bill_created, first_payment_above_20_date) END AS fixed_days_unpaid_bill
---             ,CASE   WHEN total_payments_in_90_days IS NULL THEN act_acct_cd
---                     WHEN total_payments_in_90_days < max_mrc_first_bill THEN act_acct_cd ELSE NULL END AS npn_flag
---     FROM first_cycle_info 
---     LEFT JOIN Payments_basic USING (act_acct_cd)
---     INNER JOIN sales_channel_calculation USING(act_acct_cd)
--- )
-
 , npn_85 as (
 SELECT
     *, 
