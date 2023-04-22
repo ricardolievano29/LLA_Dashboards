@@ -71,7 +71,7 @@ WHERE
 --- --- --- --- --- --- --- --- --- --- --- Final flag --- --- --- --- --- --- --- --- --- --- ---
 --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- ---
 
-, flag_outlier_installs as (
+, flag_billing_claims as (
 SELECT
     F.*, 
     bill_claim_flag
@@ -96,7 +96,7 @@ SELECT
     end as odr_e_fla_final_tenure, ---E_FinalTenureSegment,
     count(distinct fix_s_att_account) as odr_s_mes_active_base, 
     count(distinct bill_claim_flag) as opd_s_mes_uni_bill_claim
-FROM flag_outlier_installs
+FROM flag_billing_claims
 WHERE 
     fmc_s_fla_churnflag != 'Fixed Churner' 
     and fmc_s_fla_waterfall not in ('Downsell-Fixed Customer Gap', 'Fixed Base Exception', 'Churn Exception') 
