@@ -88,7 +88,7 @@ SELECT
     end as odr_e_fla_final_tenure, ---E_FinalTenureSegment,
     count(distinct MRC_Increase_flag) as opd_s_mes_uni_mrcincrease, 
     count(distinct no_plan_change) as opd_s_mes_uni_mrcnoincrease
-FROM flag_outlier_installs
+FROM flag_mrc_changes
 WHERE 
     fmc_s_fla_churnflag != 'Fixed Churner' 
     and fmc_s_fla_waterfall not in ('Downsell-Fixed Customer Gap', 'Fixed Base Exception', 'Churn Exception') 
