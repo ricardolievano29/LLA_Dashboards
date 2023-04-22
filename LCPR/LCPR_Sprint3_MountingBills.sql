@@ -62,7 +62,7 @@ GROUP BY 1, 2, 3
 --- --- --- --- --- --- --- --- --- --- --- Final flags --- --- --- --- --- --- --- --- --- --- ---
 --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- ---
 
-, mounting_bills_flag as (
+, flag_mounting_bills as (
  SELECT 
     F.*,
     mounting_bill_flag
@@ -86,7 +86,7 @@ SELECT
     end as odr_e_fla_final_tenure,
     count(distinct fix_s_att_account) as odr_s_mes_active_base, 
     count(distinct mounting_bill_flag) as opd_s_mes_uni_moun_gbills
-FROM mounting_bills_flag
+FROM flag_mounting_bills
 WHERE 
     fmc_s_fla_churnflag != 'Fixed Churner' 
     and fmc_s_fla_waterfall not in ('Downsell-Fixed Customer Gap', 'Fixed Base Exception', 'Churn Exception') 
