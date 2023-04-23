@@ -363,40 +363,27 @@ GROUP BY 1, 2, 3, 4
 --- --- --- --- --- --- --- --- --- --- --- Tickets per month --- --- --- --- --- --- --- --- --- --- ---
 --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- ---
 
--- , users_tickets_per_month as (
--- SELECT
---     distinct account_id, 
---     ticket_month,
---     interaction_id, 
---     interaction_date, 
---     interaction_type
--- FROM full_interactions
--- WHERE 
---     date(ticket_month) = (SELECT input_month FROM parameters)
--- )
+, users_tickets_per_month as (
+SELECT
+    distinct account_id, 
+    ticket_month,
+    interaction_id, 
+    interaction_date, 
+    interaction_type
+FROM full_interactions
+WHERE 
+    date(ticket_month) = (SELECT input_month FROM parameters)
+)
 
--- , tickets_per_month as (
--- SELECT
---     ticket_month, 
---     account_id,
---     case when interaction_type in ('tech_call', 'truckroll') then interaction_id else null end as tickets_flag
--- FROM users_tickets_per_month
--- WHERE interaction_id is not null
--- -- GROUP BY 1, 2
--- )
-
--- , pre_tickets_per_month_flag as (
--- SELECT
---     F.fmc_s_dim_month,
---     F.fix_s_att_account, 
---     tickets_flag
--- FROM fmc_table_adj F 
--- LEFT JOIN tickets_per_month I
---     ON cast(F.fix_s_att_account as varchar) = cast(I.account_id as varchar) and F.fmc_s_dim_month = I.ticket_month
--- WHERE fix_e_att_active = 1
--- -- GROUP BY 1, 2
--- )
-
+, tickets_per_month as (
+SELECT
+    ticket_month, 
+    account_id,
+    case when interaction_type in ('tech_call', 'truckroll') then interaction_id else null end as tickets_flag
+FROM users_tickets_per_month
+WHERE interaction_id is not null
+-- GROUP BY 1, 2
+)
 
 --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- ---
 --- --- --- --- --- --- --- --- --- --- --- Final flags --- --- --- --- --- --- --- --- --- --- ---
@@ -404,8 +391,8 @@ GROUP BY 1, 2, 3, 4
 
 , interaction_tier_flag as(
 SELECT 
-    F.*, 
-    case when I.account_id is not null then F.fix_s_att_account else null end as interactions, 
+    F.*,
+    interactions,
     interaction_tier
 FROM fmc_table_adj F
 LEFT JOIN interactions_tier I
@@ -442,40 +429,44 @@ LEFT JOIN missed_visits I
         and (F.fmc_s_dim_month = I.last_job_month)
 )
 
--- , number_tickets_flag as (
--- SELECT
---     F.*, 
---     case when tickets_flag is not null then 1 else 0 end as num_tickets
--- FROM missed_visits_flag F 
--- LEFT JOIN pre_tickets_per_month_flag I
---     ON cast(F.fix_s_att_account as varchar) = cast(I.fix_s_att_account as varchar) and F.fmc_s_dim_month = I.fmc_s_dim_month
--- )
+, number_tickets_flag as (
+SELECT
+    F.*, 
+    tickets_flag
+FROM missed_visits_flag F 
+LEFT JOIN tickets_per_month I
+    ON cast(F.fix_s_att_account as varchar) = cast(I.account_id as varchar) and F.fmc_s_dim_month = I.ticket_month
+)
 
 , final_table as (
-SELECT
-    fmc_s_dim_month as opd_s_dim_month,
-    fix_b_fla_tech as fmc_b_fla_tech_type,
-    fix_b_fla_fmc as fmc_b_fla_fmc_status,
-    fix_b_fla_mixcodeadj as fmc_b_dim_mix_code_adj,
-    fix_e_fla_tech as fmc_e_fla_tech_type,
-    fix_e_fla_fmc as fmc_e_fla_fmc_status,
-    fix_e_fla_mixcodeadj as fmc_e_dim_mix_code_adj,
-    fix_b_fla_tenure as fmc_b_fla_final_tenure,
-    fix_e_fla_tenure as fmc_e_fla_final_tenure,
-    fix_s_fla_churntype as fmc_s_fla_churn_type,
-    interaction_tier as odr_s_fla_interaction_tier,
-    ticket_tier as odr_s_fla_tickets_tier,
-    sum(interactions) as odr_s_mes_user_interactions,
-    count(distinct fix_s_att_account) as odr_s_mes_total_accounts, 
+SELECT 
+    fmc_s_dim_month as odr_s_dim_month,
+    fmc_e_fla_tech as odr_e_fla_final_tech,
+    fmc_e_fla_fmcsegment as odr_e_fla_fmc_segment,
+    fmc_e_fla_fmc as odr_e_fla_fmc_type,
+    case 
+        when fmc_e_fla_tenure = 'Early Tenure' then 'Early-Tenure'
+        when fmc_e_fla_tenure = 'Mid Tenure' then 'Mid-Tenure'
+        when fmc_e_fla_tenure = 'Late Tenure' then 'Late-Tenure'
+    end as odr_e_fla_final_tenure,
+    interaction_tier as odr_s_fla_interaction_tier, 
+    -- ticket_tier as odr_s_fla_tickets_tier, --- Omitted because causes duplication of tickets per month
     count(distinct case when fix_e_att_active = 1 then fix_s_att_account else null end) as odr_s_mes_active_base,
+    count(distinct fix_s_att_account) as odr_s_mes_total_accounts, 
+    count(distinct case when ticket_tier = '1' then fix_s_att_account else null end) as odr_s_mes_one_ticket,  
+    count(distinct case when ticket_tier in ('2', '>3') then fix_s_att_account else null end) as odr_s_mes_over1_ticket,
+    count(distinct case when ticket_tier = '2' then fix_s_att_account else null end) as odr_s_mes_two_tickets, 
+    count(distinct interactions) as odr_s_mes_user_interactions,
+    count(distinct tickets_flag) as odr_s_mes_number_tickets,
     count(distinct outlier_repair_flag) as odr_s_mes_outlier_repairs, 
     count(distinct missed_visit_flag) as odr_s_mes_missed_visits
-FROM missed_visits_flag
-WHERE 
+FROM number_tickets_flag
+WHERE
     fmc_s_fla_churnflag != 'Fixed Churner' 
-    and fmc_s_fla_waterfall not in ('Downsell-Fixed Customer Gap', 'Fixed Base Exception', 'Churn Exception') 
+    and fmc_s_fla_waterfall not in ('Downsell-Fixed Customer Gap', '6.Null last day', 'Churn Exception')
     and fix_s_fla_mainmovement != '6.Null last day'
-GROUP BY 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12
+GROUP BY 1, 2, 3, 4, 5, 6
+ORDER BY 1, 2, 3, 4, 5, 6
 )
 
 SELECT * FROM final_table
@@ -495,8 +486,9 @@ SELECT * FROM final_table
 --- --- --- ### ### ### Reiterative tickets (60-day moving window)
 
 -- SELECT
---     odr_s_fla_tickets_tier,
---     sum(odr_s_mes_total_accounts) as num_clients
+--     sum(odr_s_mes_one_ticket) as clients_w_one_ticket,
+--     sum(odr_s_mes_two_tickets) as clients_w_two_tickets,
+--     sum(odr_s_mes_over1_ticket) as clients_w_over_one_tickets
 -- FROM final_table
 -- GROUP BY 1
 
@@ -524,7 +516,6 @@ SELECT * FROM final_table
 --     cast(sum(odr_s_mes_number_tickets) as double)/(cast(sum(odr_s_mes_active_base) as double)/100) as tickets_per_100_users
 -- FROM final_table
 
---- --- --- ### ### ### A
-
+--- --- --- ### ### ### Nodes ticket density (Is in another query with the CX table structure)
 
 
