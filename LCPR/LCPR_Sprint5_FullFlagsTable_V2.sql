@@ -1,5 +1,5 @@
 --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- ---
---- --- --- --- ##### LCPR - SPRINT 3 - OPERATIONAL DRIVERS - FULL FLAGS TABLE ##### --- --- --- ---
+--- --- --- --- ##### LCPR - SPRINT 5 - OPERATIONAL DRIVERS - FULL FLAGS TABLE ##### --- --- --- ---
 --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- ---
 WITH
 
@@ -500,7 +500,7 @@ SELECT * FROM final_table
 --     cast(sum(odr_s_mes_outlier_repairs) as double)/cast(sum(odr_s_mes_active_base) as double) as KPI
 -- FROM final_table
 
---- --- --- ### ### ### Missed visits
+--- --- --- ### ### ### Missed visits (60-day moving window)
 
 -- SELECT
 --     sum(odr_s_mes_missed_visits) as missed_visits,
