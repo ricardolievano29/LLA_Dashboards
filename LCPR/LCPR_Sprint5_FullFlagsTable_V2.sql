@@ -456,6 +456,7 @@ SELECT
     count(distinct case when ticket_tier = '1' then fix_s_att_account else null end) as odr_s_mes_one_ticket,  
     count(distinct case when ticket_tier in ('2', '>3') then fix_s_att_account else null end) as odr_s_mes_over1_ticket,
     count(distinct case when ticket_tier = '2' then fix_s_att_account else null end) as odr_s_mes_two_tickets, 
+    count(distinct case when ticket_tier in ('>3') then fix_s_att_account else null end) as odr_s_mes_three_more_tickets,
     count(distinct interactions) as odr_s_mes_user_interactions,
     count(distinct tickets_flag) as odr_s_mes_number_tickets,
     count(distinct outlier_repair_flag) as odr_s_mes_outlier_repairs, 
@@ -517,5 +518,3 @@ SELECT * FROM final_table
 -- FROM final_table
 
 --- --- --- ### ### ### Nodes ticket density (Is in another query with the CX table structure)
-
-
