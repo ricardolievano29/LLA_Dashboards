@@ -530,7 +530,7 @@ SELECT
     count(distinct fix_s_att_account) as odr_s_mes_active_base,
     count(distinct new_sales_flag) as opd_s_mes_sales,
     count(distinct npn_85_flag) as opd_s_mes_never_paid, 
-    count(distinct early_ticket_flag) as EarlyTickets,
+    count(distinct early_ticket_flag) as opd_s_mes_uni_early_tickets,
     count(distinct outlier_install_flag) as opd_s_mes_long_installs, 
     count(distinct MRC_Increase_flag) as opd_s_mes_uni_mrcincrease, 
     count(distinct no_plan_change) as opd_s_mes_uni_mrcnoincrease, 
