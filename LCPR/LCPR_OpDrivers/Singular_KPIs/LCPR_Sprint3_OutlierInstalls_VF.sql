@@ -77,6 +77,7 @@ WHERE
     org_id = 'LCPR' and org_cntry = 'PR'
     and order_status = 'COMPLETE'
     and command_id = 'CONNECT'
+    and date_trunc('month', date(order_start_date)) = (SELECT input_month FROM parameters)
 )
 
 , new_installations as (
