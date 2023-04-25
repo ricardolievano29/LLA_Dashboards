@@ -196,8 +196,8 @@ INNER JOIN last_interaction L
 
 , interactions_count as (
 SELECT
-    distinct account_id,
-    last_interaction_month, 
+    last_interaction_month,
+    account_id,
     count(distinct interaction_id) as interactions
 FROM join_last_interaction
 WHERE
@@ -392,7 +392,7 @@ WHERE interaction_id is not null
 , interaction_tier_flag as(
 SELECT 
     F.*,
-    interactions,
+    case when I.account_id is not null then fix_s_att_account else null end as interactions,
     interaction_tier
 FROM fmc_table_adj F
 LEFT JOIN interactions_tier I
@@ -517,4 +517,22 @@ SELECT * FROM final_table
 --     cast(sum(odr_s_mes_number_tickets) as double)/(cast(sum(odr_s_mes_active_base) as double)/100) as tickets_per_100_users
 -- FROM final_table
 
+--- --- --- ### ### ### Contact Intensity (calculated directly in the Dashboard)
+
+-- SELECT
+--     sum(case when odr_s_fla_interaction_tier = '1' then odr_s_mes_user_interactions else null end) as users_interactions, 
+--     sum(odr_s_mes_active_base) as active_base, 
+--     cast(sum(case when odr_s_fla_interaction_tier = '1' then odr_s_mes_user_interactions else null end) as double)/cast(sum(odr_s_mes_active_base) as double) as KPI
+-- FROM final_table
+
+--- --- --- ### ### ### Repeated Callers (calculated directly in the Dashboard)
+
+-- SELECT
+--     sum(case when odr_s_fla_interaction_tier in ('2', '>3') then odr_s_mes_user_interactions else null end) as users_interactions,
+--     sum(odr_s_mes_active_base) as active_base, 
+--     cast(sum(case when odr_s_fla_interaction_tier in ('2', '>3') then odr_s_mes_user_interactions else null end) as double)/cast(sum(odr_s_mes_active_base) as double) as KPI
+-- FROM final_table
+
 --- --- --- ### ### ### Nodes ticket density (Is in another query with the CX table structure)
+
+
