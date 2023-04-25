@@ -60,20 +60,20 @@ WHERE
 ORDER BY 1
 )
 
-, new_customers3m as (   
-SELECT 
-    dna_month,
-    date_trunc('month', fix_b_att_maxstart) as install_month, 
-    fix_b_att_maxstart,  
-    fix_s_att_account as new_sales3m_flag,
-    fix_s_att_account, 
-    fi_tot_mrc_amt,
-    delinquency_days,
-    bill_from_dte_sbb, 
-    dt
-FROM new_customers_pre
-WHERE date_trunc('month', date(fix_b_att_maxstart)) = ((SELECT input_month FROM parameters) - interval '3' month)
-)
+-- , new_customers3m as (   
+-- SELECT 
+--     dna_month,
+--     date_trunc('month', fix_b_att_maxstart) as install_month, 
+--     fix_b_att_maxstart,  
+--     fix_s_att_account as new_sales3m_flag,
+--     fix_s_att_account, 
+--     fi_tot_mrc_amt,
+--     delinquency_days,
+--     bill_from_dte_sbb, 
+--     dt
+-- FROM new_customers_pre
+-- WHERE date_trunc('month', date(fix_b_att_maxstart)) = ((SELECT input_month FROM parameters) - interval '3' month)
+-- )
 
 , new_customers2m as (   
 SELECT 
@@ -110,7 +110,7 @@ FROM "lcpr.stage.prod"."lcpr_interactions_csg"
 WHERE
     cast(interaction_start_time as varchar) != ' ' 
     and interaction_start_time is not null
-    and date_trunc('month', date(interaction_start_time)) between (SELECT input_month FROM parameters) and ((SELECT input_month FROM parameters) + interval '2' month) 
+    and date_trunc('month', date(interaction_start_time)) between (SELECT input_month FROM parameters) and ((SELECT input_month FROM parameters) + interval '2' month)
     and account_type = 'RES'
 )
 
@@ -142,7 +142,7 @@ SELECT
     sub_acct_no_sbb
 FROM "lcpr.stage.dev"."truckrolls" 
 WHERE 
-    date_trunc('month', date(create_dte_ojb)) between (SELECT input_month FROM parameters) and ((SELECT input_month FROM parameters) + interval '2' month) 
+    date_trunc('month', date(create_dte_ojb)) between (SELECT input_month FROM parameters) and ((SELECT input_month FROM parameters) + interval '2' month)
 )
 
 , full_interactions as (
@@ -320,12 +320,12 @@ GROUP BY 1, 2, 3, 4
 , early_tickets AS (
 SELECT 
     A.fix_s_att_account, 
-    new_sales_flag,
+    new_sales2m_flag,
     install_month, 
     interaction_start_month, 
     fix_b_att_maxstart,
     case when date_diff('week', date(fix_b_att_maxstart), date(min_interaction_date)) <= 7 then fix_s_att_account else null end as early_ticket_flag
-FROM new_customers A 
+FROM new_customers2m A 
 LEFT JOIN relevant_interactions B 
     ON cast(A.fix_s_att_account as varchar) = cast(B.customer_id as varchar)
 WHERE interaction_type in ('tech_call', 'truckroll')
@@ -343,7 +343,6 @@ WHERE
     org_id = 'LCPR' and org_cntry = 'PR'
     and order_status = 'COMPLETE'
     and command_id = 'CONNECT'
-    and date_trunc('month',date(order_start_date)) = (SELECT input_month FROM parameters) 
 )
 
 , outlier_installs as (
