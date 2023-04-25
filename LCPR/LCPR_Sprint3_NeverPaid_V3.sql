@@ -3,7 +3,7 @@
 --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- ---
 WITH
 
-parameters as (SELECT date('2023-03-01') as input_month)
+parameters as (SELECT date('2022-12-01') as input_month)
 
 --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- ---
 --- --- --- --- --- --- --- --- --- --- --- FMC Table --- --- --- --- --- --- --- --- --- --- ---
@@ -207,14 +207,14 @@ GROUP BY 1, 2, 3, 4, 5
 ORDER BY 1, 2, 3, 4, 5
 )
 
--- SELECT * FROM final_table
+SELECT * FROM final_table
 
 --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- ---
 --- --- --- --- --- --- --- --- --- --- --- Tests --- --- --- --- --- --- --- --- --- --- ---
 --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- ---
 
-SELECT 
-    sum(opd_s_mes_never_paid) as npn_85, 
-    sum(opd_s_mes_sales) as sales_base, 
-    cast(sum(opd_s_mes_never_paid) as double)/cast(sum(opd_s_mes_sales) as double) as KPI
-FROM final_table
+-- SELECT 
+--     sum(opd_s_mes_never_paid) as npn_85, 
+--     sum(opd_s_mes_sales) as sales_base, 
+--     cast(sum(opd_s_mes_never_paid) as double)/cast(sum(opd_s_mes_sales) as double) as KPI
+-- FROM final_table
