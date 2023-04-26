@@ -1,6 +1,9 @@
 --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- ---
 --- --- --- --- ##### LCPR - SPRINT 3 - OPERATIONAL DRIVERS - FULL FLAGS TABLE ##### --- --- --- ---
 --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- ---
+
+--- WARNING: Estimated runtime of 7 minutes.
+
 WITH
 
 parameters as (SELECT date('2023-03-01') as input_month)
@@ -531,7 +534,8 @@ SELECT
         when fmc_e_fla_tenure = 'Mid Tenure' then 'Mid-Tenure'
         when fmc_e_fla_tenure = 'Late Tenure' then 'Late-Tenure'
     end as odr_e_fla_final_tenure,
-    count(distinct fix_s_att_account) as odr_s_mes_active_base,
+    count(distinct case when fix_e_att_active = 1 then fix_s_att_account else null end) as odr_s_mes_active_base,
+    count(distinct fix_s_att_account) as odr_s_mes_total_accounts,
     count(distinct new_sales_flag) as opd_s_mes_sales,
     count(distinct npn_85_flag) as opd_s_mes_never_paid, 
     count(distinct early_ticket_flag) as opd_s_mes_uni_early_tickets,
@@ -566,7 +570,7 @@ SELECT * FROM final_table
 --- --- --- ### ### ### Early Tickets (7 weeks)
 
 -- SELECT 
---     sum(EarlyTickets) as early_tickets, 
+--     sum(opd_s_mes_uni_early_tickets) as early_tickets, 
 --     sum(opd_s_mes_sales) as sales_base, 
 --     cast(sum(EarlyTickets) as double)/cast(sum(opd_s_mes_sales) as double) as KPI
 -- FROM final_table
