@@ -63,4 +63,9 @@ SELECT
     count(distinct same_channel_flag) as total_match_channel
 FROM join_interactions_transactions
     
-    
+-- SELECT
+--     distinct interaction_channel, 
+--     count(distinct same_channel_flag)
+-- FROM join_interactions_transactions
+-- GROUP BY 1
+-- ORDER BY 2 desc
